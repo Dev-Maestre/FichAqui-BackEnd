@@ -344,7 +344,7 @@ class PedidoCheckoutService
 
     /**
      * @param  Collection<int, array{variante: OfertaVariante, quantity: int, unitPrice: float, itemName: string, stallName: string, category: string, image: string}>  $lines
-     * @return list<array{title: string, unit_price: string, quantity: int, unit_measure: string}>
+     * @return list<array{title: string, unit_price: string, quantity: int}>
      */
     private function buildMercadoPagoItems(Collection $lines): array
     {
@@ -353,7 +353,6 @@ class PedidoCheckoutService
                 'title' => Str::limit((string) $line['itemName'], 150, ''),
                 'unit_price' => number_format((float) $line['unitPrice'], 2, '.', ''),
                 'quantity' => (int) $line['quantity'],
-                'unit_measure' => 'un',
             ])
             ->values()
             ->take(10)

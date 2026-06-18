@@ -82,7 +82,18 @@ class MercadoPagoGateway implements PaymentGateway
         ];
 
         if ($request->items !== []) {
-            $body['items'] = array_slice($request->items, 0, 10);
+            $body['items'] = array_slice(
+                array_map(
+                    fn (array $item) => array_filter([
+                        'title' => isset($item['title']) ? Str::limit((string) $item['title'], 150, '') : null,
+                        'unit_price' => isset($item['unit_price']) ? (string) $item['unit_price'] : null,
+                        'quantity' => isset($item['quantity']) ? (int) $item['quantity'] : null,
+                    ], fn ($value) => $value !== null && $value !== ''),
+                    $request->items
+                ),
+                0,
+                10
+            );
         }
 
         return $this->postOrder($body, $request->idempotencyKey);
