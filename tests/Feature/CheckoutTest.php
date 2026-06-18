@@ -28,7 +28,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_with_offerings_generates_fichas(): void
     {
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -60,7 +60,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_rejects_unavailable_variant(): void
     {
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -90,7 +90,7 @@ class CheckoutTest extends TestCase
             'is_default' => true,
         ]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');

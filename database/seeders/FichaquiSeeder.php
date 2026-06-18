@@ -42,12 +42,12 @@ class FichaquiSeeder extends Seeder
         return [
             [
                 'external_id' => 'user-maria',
-                'email' => 'maria@email.com',
+                'email' => 'maria@testuser.com',
                 'password' => '123456',
                 'name' => 'Maria Silva',
                 'roles' => ['client'],
                 'phone' => '(41) 99999-1234',
-                'cpf' => '123.456.789-09',
+                'cpf' => '529.982.247-25',
                 'birth_date' => '1992-03-15',
             ],
             [

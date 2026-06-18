@@ -56,7 +56,7 @@ class Adr0004HandoffTest extends TestCase
     {
         config(['mercadopago.access_token' => null]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -97,7 +97,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -144,7 +144,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -196,7 +196,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -232,7 +232,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -255,8 +255,9 @@ class Adr0004HandoffTest extends TestCase
             'mercadopago.sandbox' => true,
         ]));
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
-        Sanctum::actingAs($maria);
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria->update(['email' => 'maria@email.com']);
+        Sanctum::actingAs($maria->fresh());
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
 
@@ -267,7 +268,11 @@ class Adr0004HandoffTest extends TestCase
             'paymentMethod' => 'pix',
         ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['paymentMethod']);
+            ->assertJsonValidationErrors(['paymentMethod'])
+            ->assertJsonFragment(['paymentMethod' => [
+                'No sandbox do Mercado Pago, use um e-mail de comprador de teste (@testuser.com). '
+                .'Crie em Credenciais de teste > Contas de teste no painel MP.',
+            ]]);
 
         Http::assertNothingSent();
     }
@@ -311,7 +316,7 @@ class Adr0004HandoffTest extends TestCase
                 ], 200),
         ]);
 
-        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');

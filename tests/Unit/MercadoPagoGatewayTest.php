@@ -47,7 +47,7 @@ class MercadoPagoGatewayTest extends TestCase
             externalReference: 'pedido-online-1',
             payerEmail: 'test_user_123@testuser.com',
             payerName: 'Maria Silva',
-            payerCpf: '12345678909',
+            payerCpf: '52998224725',
             shipmentAddress: [
                 'zip_code' => '80010000',
                 'street_name' => 'Rua Teste',
@@ -97,12 +97,13 @@ class MercadoPagoGatewayTest extends TestCase
         $gateway = new MercadoPagoGateway;
 
         $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectExceptionMessage('E-mail invalido para sandbox');
 
         $gateway->createOnlinePixOrder(new OnlineOrderRequest(
             idempotencyKey: 'pedido-online-402',
             amount: 10.0,
             externalReference: 'pedido-online-402',
-            payerEmail: 'maria@email.com',
+            payerEmail: 'maria@testuser.com',
             shipmentAddress: [
                 'zip_code' => '80010000',
                 'street_name' => 'Rua Teste',
@@ -187,7 +188,7 @@ class MercadoPagoGatewayTest extends TestCase
             idempotencyKey: 'pedido-test-1',
             amount: 16.0,
             description: 'Pedido FichAqui',
-            payerEmail: 'maria@email.com',
+            payerEmail: 'maria@testuser.com',
             token: 'card-token-from-mp-js',
             installments: 1,
             paymentMethodId: 'visa',

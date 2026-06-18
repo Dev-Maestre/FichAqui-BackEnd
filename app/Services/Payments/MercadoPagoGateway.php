@@ -8,6 +8,8 @@ use App\Data\Payments\GatewayPaymentResult;
 use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
+use App\Support\Cpf;
+use App\Support\MercadoPagoErrors;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -40,22 +42,25 @@ class MercadoPagoGateway implements PaymentGateway
             $payer['last_name'] = $lastName;
         }
 
-        $cpf = $this->digitsOnly($request->payerCpf);
+        $cpf = Cpf::digits($request->payerCpf);
 
-        if ($cpf !== null) {
+        if ($cpf !== null && Cpf::isValid($cpf)) {
             $payer['identification'] = [
                 'type' => 'CPF',
                 'number' => $cpf,
             ];
         }
 
-        $shipmentAddress = $request->shipmentAddress !== []
-            ? $request->shipmentAddress
-            : config('mercadopago.pix_shipment', []);
+        $shipmentAddress = $this->normalizeShipmentAddress(
+            $request->shipmentAddress !== []
+                ? $request->shipmentAddress
+                : config('mercadopago.pix_shipment', [])
+        );
 
         $body = [
             'type' => 'online',
             'external_reference' => Str::limit($request->externalReference, 64, ''),
+            'description' => Str::limit($request->description, 150, ''),
             'total_amount' => $amount,
             'processing_mode' => 'automatic',
             'payer' => $payer,
@@ -75,6 +80,10 @@ class MercadoPagoGateway implements PaymentGateway
                 ],
             ],
         ];
+
+        if ($request->items !== []) {
+            $body['items'] = array_slice($request->items, 0, 10);
+        }
 
         return $this->postOrder($body, $request->idempotencyKey);
     }
@@ -121,67 +130,67 @@ class MercadoPagoGateway implements PaymentGateway
     {
         $response = $this->client($idempotencyKey)->post('/v1/orders', $body);
 
-        if ($response->status() === 402) {
-            $this->throwOrderFailure($response);
-        }
+        $payload = $this->parseJsonResponse($response);
 
-        $response->throw();
-
-        return $this->mapOrderResponse($response->json());
+        return $this->mapOrderResponse($payload);
     }
 
-    private function throwOrderFailure(Response $response): never
+    /**
+     * @return array<string, mixed>
+     */
+    private function parseJsonResponse(Response $response): array
     {
+        if ($response->status() === 402 || $response->failed()) {
+            throw ValidationException::withMessages([
+                'paymentMethod' => [
+                    MercadoPagoErrors::messageFromPayload($response->json()),
+                ],
+            ]);
+        }
+
         $payload = $response->json();
-        $message = 'A transacao PIX falhou no Mercado Pago.';
 
-        if (is_array($payload)) {
-            $errors = $payload['errors'] ?? null;
-
-            if (is_array($errors) && $errors !== []) {
-                $details = collect($errors)
-                    ->flatMap(function ($error) {
-                        if (! is_array($error)) {
-                            return [];
-                        }
-
-                        $parts = array_filter([
-                            $error['message'] ?? null,
-                            isset($error['details']) && is_array($error['details'])
-                                ? implode('; ', array_map('strval', $error['details']))
-                                : null,
-                        ]);
-
-                        return $parts !== [] ? [implode(': ', $parts)] : [];
-                    })
-                    ->implode(' | ');
-
-                if ($details !== '') {
-                    $message = 'Mercado Pago: '.$details;
-                }
-            }
-
-            $paymentDetail = data_get($payload, 'transactions.payments.0.status_detail');
-
-            if (is_string($paymentDetail) && $paymentDetail !== '') {
-                $message .= ' ('.$paymentDetail.')';
-            }
+        if (! is_array($payload)) {
+            throw ValidationException::withMessages([
+                'paymentMethod' => ['Resposta invalida do Mercado Pago.'],
+            ]);
         }
 
-        throw ValidationException::withMessages([
-            'paymentMethod' => [$message],
-        ]);
+        return $payload;
     }
 
-    private function digitsOnly(?string $value): ?string
+    /**
+     * @param  array<string, mixed>  $address
+     * @return array<string, string>
+     */
+    private function normalizeShipmentAddress(array $address): array
     {
-        if ($value === null || $value === '') {
-            return null;
+        $zip = preg_replace('/\D+/', '', (string) ($address['zip_code'] ?? '80010000')) ?: '80010000';
+        $zip = str_pad(substr($zip, 0, 8), 8, '0');
+
+        $streetNumber = trim((string) ($address['street_number'] ?? '1'));
+        if ($streetNumber === '' || ! preg_match('/^\d+$/', $streetNumber)) {
+            $streetNumber = '1';
         }
 
-        $digits = preg_replace('/\D+/', '', $value);
+        $state = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string) ($address['state'] ?? 'PR')) ?: 'PR', 0, 2));
 
-        return is_string($digits) && $digits !== '' ? $digits : null;
+        $normalized = [
+            'zip_code' => $zip,
+            'street_name' => Str::limit((string) ($address['street_name'] ?? 'Local do evento'), 80, ''),
+            'street_number' => $streetNumber,
+            'neighborhood' => Str::limit((string) ($address['neighborhood'] ?? 'Centro'), 60, ''),
+            'city' => strtoupper(Str::limit((string) ($address['city'] ?? 'CURITIBA'), 60, '')),
+            'state' => $state !== '' ? $state : 'PR',
+        ];
+
+        $complement = trim((string) ($address['complement'] ?? ''));
+
+        if ($complement !== '') {
+            $normalized['complement'] = Str::limit($complement, 60, '');
+        }
+
+        return $normalized;
     }
 
     public function createPixPayment(PixPaymentRequest $request): GatewayPaymentResult
@@ -197,9 +206,9 @@ class MercadoPagoGateway implements PaymentGateway
             ],
         ]);
 
-        $response->throw();
+        $payload = $this->parseJsonResponse($response);
 
-        return $this->mapPaymentResponse($response->json());
+        return $this->mapPaymentResponse($payload);
     }
 
     public function createCardPayment(CardPaymentRequest $request): GatewayPaymentResult
