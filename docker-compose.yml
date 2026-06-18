@@ -30,7 +30,8 @@ services:
     env_file:
       - .env
     command: >
-      sh -c "composer install --no-interaction --prefer-dist &&
+      sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist ${COMPOSER_INSTALL_FLAGS:-}; fi &&
+             php artisan package:discover --ansi || true &&
              php artisan config:clear --no-interaction &&
              php artisan migrate --force --no-interaction &&
              php artisan db:seed --force --no-interaction || true &&

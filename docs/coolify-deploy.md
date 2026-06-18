@@ -38,10 +38,10 @@ MP_WEBHOOK_URL=https://api.seudominio.com/api/webhooks/mercadopago
 
 ## Redeploy
 
-1. Push das alteracoes
+1. Push das alteracoes (inclui `Dockerfile` com `COPY` do projeto)
 2. Confirme `APP_PORT=8001` no `.env` do Coolify
 3. Confirme **Port Exposes = 8001** no servico
-4. Redeploy
+4. **Redeploy com rebuild** (Coolify: "Force rebuild" se o erro persistir)
 
 ## Desenvolvimento local
 

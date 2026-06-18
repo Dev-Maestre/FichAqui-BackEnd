@@ -11,5 +11,7 @@ services:
     container_name: fichaqui-api
     ports:
       - "${APP_PORT:-8001}:${APP_PORT:-8001}"
+    environment:
+      COMPOSER_INSTALL_FLAGS: ""
     volumes:
       - .:/var/www/html
