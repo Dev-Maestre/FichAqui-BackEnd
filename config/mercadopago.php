@@ -18,7 +18,7 @@ return [
 
     'webhook_secret' => env('MP_WEBHOOK_SECRET'),
 
-    'webhook_url' => env('MP_WEBHOOK_URL'),
+    'webhook_url' => env('MP_WEBHOOK_URL', 'https://fichaqui.baiacubo.tech/webhook-mp'),
 
     'sandbox' => env('MP_SANDBOX', true),
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MercadoPagoWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -12,3 +13,5 @@ Route::get('/', function () {
 });
 
 Route::view('/docs', 'swagger');
+
+Route::post('/webhook-mp', MercadoPagoWebhookController::class);
