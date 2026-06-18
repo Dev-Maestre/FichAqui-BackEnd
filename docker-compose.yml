@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-fich_aqui}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
     ports:
-      - "5432:5432"
+      - "5433:5433"
     volumes:
       - fichaqui_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -35,7 +35,7 @@ services:
       APP_DEBUG: false
       APP_URL: https://fichaqui.baiacubo.tech
       DB_HOST: postgres
-      DB_PORT: 5432
+      DB_PORT: 5433
     command: >
       sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist ${COMPOSER_INSTALL_FLAGS:-}; fi &&
              php artisan package:discover --ansi || true &&
