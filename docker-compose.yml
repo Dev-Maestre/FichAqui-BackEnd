@@ -35,7 +35,7 @@ services:
       APP_DEBUG: false
       APP_URL: https://fichaqui.baiacubo.tech
       DB_HOST: postgres
-      DB_PORT: 5433
+      DB_PORT: 5432
     command: >
       sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist ${COMPOSER_INSTALL_FLAGS:-}; fi &&
              php artisan package:discover --ansi || true &&
