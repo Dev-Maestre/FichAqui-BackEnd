@@ -47,6 +47,15 @@ class MercadoPagoGatewayTest extends TestCase
             externalReference: 'pedido-online-1',
             payerEmail: 'test_user_123@testuser.com',
             payerName: 'Maria Silva',
+            payerCpf: '12345678909',
+            shipmentAddress: [
+                'zip_code' => '80010000',
+                'street_name' => 'Rua Teste',
+                'street_number' => '100',
+                'neighborhood' => 'Centro',
+                'city' => 'CURITIBA',
+                'state' => 'PR',
+            ],
         ));
 
         $this->assertTrue($result->isPending());
@@ -58,9 +67,51 @@ class MercadoPagoGatewayTest extends TestCase
         Http::assertSent(function ($request) {
             return $request->hasHeader('X-Idempotency-Key', 'pedido-online-1')
                 && $request['type'] === 'online'
+                && $request['processing_mode'] === 'automatic'
+                && isset($request['shipment']['address']['zip_code'])
                 && $request['payer']['email'] === 'test_user_123@testuser.com'
+                && $request['payer']['identification']['type'] === 'CPF'
                 && $request['transactions']['payments'][0]['payment_method']['id'] === 'pix';
         });
+    }
+
+    public function test_create_online_pix_order_maps_402_to_validation_error(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders' => Http::response([
+                'errors' => [
+                    [
+                        'code' => 'failed',
+                        'message' => 'The following transactions failed',
+                        'details' => ['PAY01TEST: invalid_email_for_sandbox'],
+                    ],
+                ],
+            ], 402),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        $gateway->createOnlinePixOrder(new OnlineOrderRequest(
+            idempotencyKey: 'pedido-online-402',
+            amount: 10.0,
+            externalReference: 'pedido-online-402',
+            payerEmail: 'maria@email.com',
+            shipmentAddress: [
+                'zip_code' => '80010000',
+                'street_name' => 'Rua Teste',
+                'street_number' => '1',
+                'neighborhood' => 'Centro',
+                'city' => 'CURITIBA',
+                'state' => 'PR',
+            ],
+        ));
     }
 
     public function test_create_qr_order_sends_dynamic_order_to_mercado_pago(): void

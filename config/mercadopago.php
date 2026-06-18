@@ -46,4 +46,22 @@ return [
 
     'qr_external_pos_id' => env('MP_QR_EXTERNAL_POS_ID'),
 
+    'pix_expiration' => env('MP_PIX_EXPIRATION', 'PT15M'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Endereco de entrega (obrigatorio para PIX online na Orders API)
+    |--------------------------------------------------------------------------
+    */
+
+    'pix_shipment' => [
+        'zip_code' => env('MP_PIX_SHIPMENT_ZIP', '80010000'),
+        'street_name' => env('MP_PIX_SHIPMENT_STREET', 'Local do evento'),
+        'street_number' => env('MP_PIX_SHIPMENT_NUMBER', 'S/N'),
+        'neighborhood' => env('MP_PIX_SHIPMENT_NEIGHBORHOOD', 'Centro'),
+        'city' => env('MP_PIX_SHIPMENT_CITY', 'CURITIBA'),
+        'state' => env('MP_PIX_SHIPMENT_STATE', 'PR'),
+        'complement' => env('MP_PIX_SHIPMENT_COMPLEMENT', ''),
+    ],
+
 ];

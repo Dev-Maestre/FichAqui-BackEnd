@@ -9,8 +9,10 @@ use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class MercadoPagoGateway implements PaymentGateway
@@ -26,19 +28,45 @@ class MercadoPagoGateway implements PaymentGateway
 
         $amount = $this->formatAmount($request->amount);
         $firstName = Str::before(trim($request->payerName ?? 'Consumidor'), ' ');
+        $lastName = trim(Str::after(trim($request->payerName ?? ''), ' '));
+
+        $payer = [
+            'email' => $request->payerEmail,
+            'first_name' => $firstName !== '' ? $firstName : 'Consumidor',
+            'entity_type' => 'individual',
+        ];
+
+        if ($lastName !== '' && $lastName !== $firstName) {
+            $payer['last_name'] = $lastName;
+        }
+
+        $cpf = $this->digitsOnly($request->payerCpf);
+
+        if ($cpf !== null) {
+            $payer['identification'] = [
+                'type' => 'CPF',
+                'number' => $cpf,
+            ];
+        }
+
+        $shipmentAddress = $request->shipmentAddress !== []
+            ? $request->shipmentAddress
+            : config('mercadopago.pix_shipment', []);
 
         $body = [
             'type' => 'online',
             'external_reference' => Str::limit($request->externalReference, 64, ''),
             'total_amount' => $amount,
-            'payer' => [
-                'email' => $request->payerEmail,
-                'first_name' => $firstName !== '' ? $firstName : 'Consumidor',
+            'processing_mode' => 'automatic',
+            'payer' => $payer,
+            'shipment' => [
+                'address' => $shipmentAddress,
             ],
             'transactions' => [
                 'payments' => [
                     [
                         'amount' => $amount,
+                        'expiration_time' => (string) config('mercadopago.pix_expiration', 'PT15M'),
                         'payment_method' => [
                             'id' => 'pix',
                             'type' => 'bank_transfer',
@@ -48,10 +76,7 @@ class MercadoPagoGateway implements PaymentGateway
             ],
         ];
 
-        $response = $this->client($request->idempotencyKey)->post('/v1/orders', $body);
-        $response->throw();
-
-        return $this->mapOrderResponse($response->json());
+        return $this->postOrder($body, $request->idempotencyKey);
     }
 
     public function createQrOrder(QrOrderRequest $request): GatewayPaymentResult
@@ -86,10 +111,77 @@ class MercadoPagoGateway implements PaymentGateway
             $body['items'] = $request->items;
         }
 
-        $response = $this->client($request->idempotencyKey)->post('/v1/orders', $body);
+        return $this->postOrder($body, $request->idempotencyKey);
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function postOrder(array $body, string $idempotencyKey): GatewayPaymentResult
+    {
+        $response = $this->client($idempotencyKey)->post('/v1/orders', $body);
+
+        if ($response->status() === 402) {
+            $this->throwOrderFailure($response);
+        }
+
         $response->throw();
 
         return $this->mapOrderResponse($response->json());
+    }
+
+    private function throwOrderFailure(Response $response): never
+    {
+        $payload = $response->json();
+        $message = 'A transacao PIX falhou no Mercado Pago.';
+
+        if (is_array($payload)) {
+            $errors = $payload['errors'] ?? null;
+
+            if (is_array($errors) && $errors !== []) {
+                $details = collect($errors)
+                    ->flatMap(function ($error) {
+                        if (! is_array($error)) {
+                            return [];
+                        }
+
+                        $parts = array_filter([
+                            $error['message'] ?? null,
+                            isset($error['details']) && is_array($error['details'])
+                                ? implode('; ', array_map('strval', $error['details']))
+                                : null,
+                        ]);
+
+                        return $parts !== [] ? [implode(': ', $parts)] : [];
+                    })
+                    ->implode(' | ');
+
+                if ($details !== '') {
+                    $message = 'Mercado Pago: '.$details;
+                }
+            }
+
+            $paymentDetail = data_get($payload, 'transactions.payments.0.status_detail');
+
+            if (is_string($paymentDetail) && $paymentDetail !== '') {
+                $message .= ' ('.$paymentDetail.')';
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'paymentMethod' => [$message],
+        ]);
+    }
+
+    private function digitsOnly(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value);
+
+        return is_string($digits) && $digits !== '' ? $digits : null;
     }
 
     public function createPixPayment(PixPaymentRequest $request): GatewayPaymentResult

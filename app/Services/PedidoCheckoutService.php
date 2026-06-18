@@ -16,6 +16,7 @@ use App\Models\OfertaVariante;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\User;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -59,6 +60,7 @@ class PedidoCheckoutService
         return DB::transaction(function () use ($user, $evento, $validated, $lines, $total, $pedidoId) {
             $payment = $this->processPayment(
                 $user,
+                $evento,
                 $validated['paymentMethod'],
                 $validated['cardId'] ?? null,
                 $validated['cardToken'] ?? null,
@@ -176,6 +178,7 @@ class PedidoCheckoutService
      */
     private function processPayment(
         User $user,
+        Evento $evento,
         string $method,
         ?string $cardId,
         ?string $cardToken,
@@ -195,7 +198,7 @@ class PedidoCheckoutService
                 $idempotencyKey,
             ),
             'wallet' => ['paymentStatus' => $this->processWallet($user, $total)],
-            'pix' => $this->processPix($user, $total, $idempotencyKey),
+            'pix' => $this->processPix($user, $evento, $total, $idempotencyKey),
             default => throw ValidationException::withMessages([
                 'paymentMethod' => ['Metodo de pagamento invalido.'],
             ]),
@@ -287,7 +290,7 @@ class PedidoCheckoutService
     /**
      * @return array{paymentStatus: string, gatewayPaymentId?: string|null, gatewayOrderId?: string|null, pixQrCode?: string|null, pixCopyPaste?: string|null, pixExpiresAt?: string|null}
      */
-    private function processPix(User $user, float $total, string $idempotencyKey): array
+    private function processPix(User $user, Evento $evento, float $total, string $idempotencyKey): array
     {
         if (! $this->paymentGateway->isConfigured()) {
             throw ValidationException::withMessages([
@@ -299,29 +302,99 @@ class PedidoCheckoutService
 
         $driver = $this->resolvePixDriver();
 
-        $result = match ($driver) {
-            'qr_pos', 'orders' => $this->paymentGateway->createQrOrder(new QrOrderRequest(
-                idempotencyKey: $idempotencyKey,
-                amount: $total,
-                description: 'Pedido FichAqui',
-                externalReference: $idempotencyKey,
-            )),
-            'payments' => $this->paymentGateway->createPixPayment(new PixPaymentRequest(
-                idempotencyKey: $idempotencyKey,
-                amount: $total,
-                description: 'Pedido FichAqui',
-                payerEmail: $user->email,
-            )),
-            default => $this->paymentGateway->createOnlinePixOrder(new OnlineOrderRequest(
-                idempotencyKey: $idempotencyKey,
-                amount: $total,
-                externalReference: $idempotencyKey,
-                payerEmail: $user->email,
-                payerName: $user->name,
-            )),
-        };
+        try {
+            $result = match ($driver) {
+                'qr_pos', 'orders' => $this->paymentGateway->createQrOrder(new QrOrderRequest(
+                    idempotencyKey: $idempotencyKey,
+                    amount: $total,
+                    description: 'Pedido FichAqui',
+                    externalReference: $idempotencyKey,
+                )),
+                'payments' => $this->paymentGateway->createPixPayment(new PixPaymentRequest(
+                    idempotencyKey: $idempotencyKey,
+                    amount: $total,
+                    description: 'Pedido FichAqui',
+                    payerEmail: $user->email,
+                )),
+                default => $this->paymentGateway->createOnlinePixOrder(new OnlineOrderRequest(
+                    idempotencyKey: $idempotencyKey,
+                    amount: $total,
+                    externalReference: $this->sanitizeExternalReference($idempotencyKey),
+                    payerEmail: $user->email,
+                    payerName: $user->name,
+                    payerCpf: $user->cpf,
+                    shipmentAddress: $this->shipmentAddressForEvento($evento),
+                )),
+            };
+        } catch (RequestException $exception) {
+            throw ValidationException::withMessages([
+                'paymentMethod' => [$this->formatMercadoPagoError($exception)],
+            ]);
+        }
 
         return $this->mapGatewayResult($result, includePix: true);
+    }
+
+    private function sanitizeExternalReference(string $reference): string
+    {
+        $sanitized = preg_replace('/[^A-Za-z0-9_-]/', '', $reference) ?? $reference;
+
+        return Str::limit($sanitized !== '' ? $sanitized : $reference, 64, '');
+    }
+
+    /**
+     * @return array{zip_code: string, street_name: string, street_number: string, neighborhood: string, city: string, state: string, complement?: string}
+     */
+    private function shipmentAddressForEvento(Evento $evento): array
+    {
+        $defaults = config('mercadopago.pix_shipment', []);
+        $location = is_string($evento->location) && $evento->location !== '' ? $evento->location : null;
+
+        return [
+            'zip_code' => (string) ($defaults['zip_code'] ?? '80010000'),
+            'street_name' => Str::limit($location ?? $evento->name ?? (string) ($defaults['street_name'] ?? 'Local do evento'), 80, ''),
+            'street_number' => (string) ($defaults['street_number'] ?? 'S/N'),
+            'neighborhood' => Str::limit($location ?? (string) ($defaults['neighborhood'] ?? 'Centro'), 60, ''),
+            'city' => Str::upper(Str::limit($evento->cidade ?: (string) ($defaults['city'] ?? 'CURITIBA'), 60, '')),
+            'state' => Str::upper(Str::limit($evento->estado ?: (string) ($defaults['state'] ?? 'PR'), 2, '')),
+            'complement' => Str::limit($evento->name ?? (string) ($defaults['complement'] ?? ''), 60, ''),
+        ];
+    }
+
+    private function formatMercadoPagoError(RequestException $exception): string
+    {
+        $response = $exception->response;
+        $payload = $response?->json();
+
+        if (is_array($payload)) {
+            $errors = $payload['errors'] ?? null;
+
+            if (is_array($errors) && $errors !== []) {
+                $messages = collect($errors)
+                    ->flatMap(function ($error) {
+                        if (! is_array($error)) {
+                            return [];
+                        }
+
+                        $parts = array_filter([
+                            $error['message'] ?? null,
+                            isset($error['details']) && is_array($error['details'])
+                                ? implode('; ', array_map('strval', $error['details']))
+                                : null,
+                        ]);
+
+                        return $parts !== [] ? [implode(': ', $parts)] : [];
+                    })
+                    ->filter()
+                    ->values();
+
+                if ($messages->isNotEmpty()) {
+                    return 'Mercado Pago: '.$messages->implode(' | ');
+                }
+            }
+        }
+
+        return 'Mercado Pago recusou o pagamento PIX. Verifique credenciais, e-mail de teste (@testuser.com) e dados do pedido.';
     }
 
     private function assertSandboxPayerEmail(User $user): void
