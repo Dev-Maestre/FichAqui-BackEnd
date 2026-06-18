@@ -29,6 +29,8 @@ readonly class GatewayPaymentResult
             'authorized',
             'created',
             'ready_to_process',
+            'action_required',
+            'waiting_transfer',
         ], true);
     }
 }

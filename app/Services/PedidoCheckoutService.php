@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\PaymentGateway;
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\GatewayPaymentResult;
+use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
 use App\Models\CartaoSalvo;
@@ -294,42 +295,68 @@ class PedidoCheckoutService
             ]);
         }
 
+        $this->assertSandboxPayerEmail($user);
+
         $driver = $this->resolvePixDriver();
 
-        if ($driver === 'orders') {
-            $result = $this->paymentGateway->createQrOrder(new QrOrderRequest(
+        $result = match ($driver) {
+            'qr_pos', 'orders' => $this->paymentGateway->createQrOrder(new QrOrderRequest(
                 idempotencyKey: $idempotencyKey,
                 amount: $total,
                 description: 'Pedido FichAqui',
                 externalReference: $idempotencyKey,
-            ));
-        } else {
-            $result = $this->paymentGateway->createPixPayment(new PixPaymentRequest(
+            )),
+            'payments' => $this->paymentGateway->createPixPayment(new PixPaymentRequest(
                 idempotencyKey: $idempotencyKey,
                 amount: $total,
                 description: 'Pedido FichAqui',
                 payerEmail: $user->email,
-            ));
-        }
+            )),
+            default => $this->paymentGateway->createOnlinePixOrder(new OnlineOrderRequest(
+                idempotencyKey: $idempotencyKey,
+                amount: $total,
+                externalReference: $idempotencyKey,
+                payerEmail: $user->email,
+                payerName: $user->name,
+            )),
+        };
 
         return $this->mapGatewayResult($result, includePix: true);
     }
 
+    private function assertSandboxPayerEmail(User $user): void
+    {
+        if (! config('mercadopago.sandbox')) {
+            return;
+        }
+
+        if (str_ends_with(strtolower($user->email), '@testuser.com')) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'paymentMethod' => [
+                'No sandbox do Mercado Pago, use um e-mail de comprador de teste (@testuser.com). '
+                .'Crie em Credenciais de teste > Contas de teste no painel MP.',
+            ],
+        ]);
+    }
+
     private function resolvePixDriver(): string
     {
-        $driver = (string) config('mercadopago.pix_driver', 'payments');
+        $driver = (string) config('mercadopago.pix_driver', 'online');
 
-        if ($driver !== 'orders') {
+        if (in_array($driver, ['qr_pos', 'orders'], true)) {
+            $posId = config('mercadopago.qr_external_pos_id');
+
+            return (is_string($posId) && $posId !== '') ? 'qr_pos' : 'online';
+        }
+
+        if ($driver === 'payments') {
             return 'payments';
         }
 
-        $posId = config('mercadopago.qr_external_pos_id');
-
-        if (is_string($posId) && $posId !== '') {
-            return 'orders';
-        }
-
-        return 'payments';
+        return 'online';
     }
 
     /**

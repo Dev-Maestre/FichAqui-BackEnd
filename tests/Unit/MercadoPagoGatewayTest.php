@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Data\Payments\CardPaymentRequest;
+use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\QrOrderRequest;
 use App\Services\Payments\MercadoPagoGateway;
 use Illuminate\Support\Facades\Http;
@@ -10,6 +11,58 @@ use Tests\TestCase;
 
 class MercadoPagoGatewayTest extends TestCase
 {
+    public function test_create_online_pix_order_sends_type_online_to_mercado_pago(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders' => Http::response([
+                'id' => 'ORDONLINE01',
+                'status' => 'action_required',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYONLINE01',
+                            'status' => 'action_required',
+                            'payment_method' => [
+                                'id' => 'pix',
+                                'qr_code' => '000201ONLINE',
+                                'qr_code_base64' => 'b64online',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+
+        $result = $gateway->createOnlinePixOrder(new OnlineOrderRequest(
+            idempotencyKey: 'pedido-online-1',
+            amount: 16.0,
+            externalReference: 'pedido-online-1',
+            payerEmail: 'test_user_123@testuser.com',
+            payerName: 'Maria Silva',
+        ));
+
+        $this->assertTrue($result->isPending());
+        $this->assertSame('PAYONLINE01', $result->gatewayPaymentId);
+        $this->assertSame('ORDONLINE01', $result->gatewayOrderId);
+        $this->assertSame('000201ONLINE', $result->pix['copyPaste'] ?? null);
+        $this->assertSame('b64online', $result->pix['qrCode'] ?? null);
+
+        Http::assertSent(function ($request) {
+            return $request->hasHeader('X-Idempotency-Key', 'pedido-online-1')
+                && $request['type'] === 'online'
+                && $request['payer']['email'] === 'test_user_123@testuser.com'
+                && $request['transactions']['payments'][0]['payment_method']['id'] === 'pix';
+        });
+    }
+
     public function test_create_qr_order_sends_dynamic_order_to_mercado_pago(): void
     {
         config([

@@ -28,6 +28,18 @@ class Adr0004HandoffTest extends TestCase
         $this->seed(WalletSeeder::class);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function mercadoPagoTestConfig(array $overrides = []): array
+    {
+        return array_merge([
+            'mercadopago.access_token' => 'TEST-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+            'mercadopago.sandbox' => false,
+        ], $overrides);
+    }
+
     public function test_unauthenticated_wallet_returns_401(): void
     {
         $this->getJson('/api/user/wallet')->assertUnauthorized();
@@ -59,12 +71,10 @@ class Adr0004HandoffTest extends TestCase
 
     public function test_pix_pending_checkout_has_no_fichas(): void
     {
-        config([
-            'mercadopago.access_token' => 'TEST-token',
-            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        config($this->mercadoPagoTestConfig([
             'mercadopago.pix_driver' => 'orders',
             'mercadopago.qr_external_pos_id' => 'STALL_POS_1',
-        ]);
+        ]));
 
         Http::fake([
             'api.mercadopago.com/v1/orders*' => Http::response([
@@ -109,21 +119,26 @@ class Adr0004HandoffTest extends TestCase
         $this->assertDatabaseCount('fichas', 0);
     }
 
-    public function test_pix_pending_checkout_uses_payments_driver_by_default(): void
+    public function test_pix_pending_checkout_uses_online_driver_by_default(): void
     {
-        config([
-            'mercadopago.access_token' => 'TEST-token',
-            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
-        ]);
+        config($this->mercadoPagoTestConfig());
 
         Http::fake([
-            'api.mercadopago.com/v1/payments' => Http::response([
-                'id' => 11223344,
-                'status' => 'pending',
-                'point_of_interaction' => [
-                    'transaction_data' => [
-                        'qr_code' => '000201PIXDEFAULT',
-                        'qr_code_base64' => 'base64data',
+            'api.mercadopago.com/v1/orders*' => Http::response([
+                'id' => 'ORD11223344',
+                'status' => 'action_required',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAY11223344',
+                            'status' => 'action_required',
+                            'payment_method' => [
+                                'id' => 'pix',
+                                'qr_code' => '000201PIXONLINE',
+                                'qr_code_base64' => 'base64online',
+                            ],
+                        ],
                     ],
                 ],
             ], 201),
@@ -142,31 +157,40 @@ class Adr0004HandoffTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('paymentStatus', 'pending')
-            ->assertJsonPath('paymentId', '11223344')
-            ->assertJsonPath('pixCopyPaste', '000201PIXDEFAULT')
-            ->assertJsonPath('pixQrCode', 'base64data')
-            ->assertJsonMissing(['gatewayOrderId' => 'ORD99887766']);
+            ->assertJsonPath('paymentId', 'PAY11223344')
+            ->assertJsonPath('gatewayOrderId', 'ORD11223344')
+            ->assertJsonPath('pixCopyPaste', '000201PIXONLINE')
+            ->assertJsonPath('pixQrCode', 'base64online');
 
-        Http::assertSent(fn ($request) => $request->url() === 'https://api.mercadopago.com/v1/payments'
-            && ($request['payment_method_id'] ?? null) === 'pix');
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.mercadopago.com/v1/orders'
+            && ($request['type'] ?? null) === 'online'
+            && ($request['transactions']['payments'][0]['payment_method']['id'] ?? null) === 'pix');
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/v1/payments'));
     }
 
-    public function test_pix_orders_without_pos_falls_back_to_payments(): void
+    public function test_pix_orders_without_pos_falls_back_to_online(): void
     {
-        config([
-            'mercadopago.access_token' => 'TEST-token',
-            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        config($this->mercadoPagoTestConfig([
             'mercadopago.pix_driver' => 'orders',
             'mercadopago.qr_external_pos_id' => null,
-        ]);
+        ]));
 
         Http::fake([
-            'api.mercadopago.com/v1/payments' => Http::response([
-                'id' => 55667788,
-                'status' => 'pending',
-                'point_of_interaction' => [
-                    'transaction_data' => [
-                        'qr_code' => '000201FALLBACK',
+            'api.mercadopago.com/v1/orders*' => Http::response([
+                'id' => 'ORD55667788',
+                'status' => 'action_required',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAY55667788',
+                            'status' => 'action_required',
+                            'payment_method' => [
+                                'id' => 'pix',
+                                'qr_code' => '000201FALLBACK',
+                            ],
+                        ],
                     ],
                 ],
             ], 201),
@@ -186,49 +210,101 @@ class Adr0004HandoffTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('pixCopyPaste', '000201FALLBACK');
 
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/v1/orders'));
+        Http::assertSent(fn ($request) => ($request['type'] ?? null) === 'online');
     }
 
-    public function test_payment_poll_fulfills_fichas_when_approved(): void
+    public function test_pix_payments_driver_still_supported(): void
     {
-        config([
-            'mercadopago.access_token' => 'TEST-token',
-            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
-            'mercadopago.pix_driver' => 'orders',
-            'mercadopago.qr_external_pos_id' => 'STALL_POS_1',
+        config($this->mercadoPagoTestConfig([
+            'mercadopago.pix_driver' => 'payments',
+        ]));
+
+        Http::fake([
+            'api.mercadopago.com/v1/payments' => Http::response([
+                'id' => 99887766,
+                'status' => 'pending',
+                'point_of_interaction' => [
+                    'transaction_data' => [
+                        'qr_code' => '000201LEGACY',
+                        'qr_code_base64' => 'legacyb64',
+                    ],
+                ],
+            ], 201),
         ]);
+
+        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 1],
+            ],
+            'paymentMethod' => 'pix',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('pixCopyPaste', '000201LEGACY');
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.mercadopago.com/v1/payments');
+    }
+
+    public function test_pix_sandbox_rejects_non_testuser_email(): void
+    {
+        config($this->mercadoPagoTestConfig([
+            'mercadopago.sandbox' => true,
+        ]));
+
+        $maria = User::query()->where('email', 'maria@email.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 1],
+            ],
+            'paymentMethod' => 'pix',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['paymentMethod']);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_payment_poll_fulfills_fichas_when_online_order_approved(): void
+    {
+        config($this->mercadoPagoTestConfig());
 
         Http::fake([
             'api.mercadopago.com/v1/orders*' => Http::sequence()
                 ->push([
                     'id' => 'ORD55443322',
-                    'status' => 'created',
-                    'type' => 'qr',
+                    'status' => 'action_required',
+                    'type' => 'online',
                     'transactions' => [
                         'payments' => [
                             [
                                 'id' => 'PAY55443322',
-                                'status' => 'created',
-                                'status_detail' => 'ready_to_process',
-                                'amount' => '32.00',
+                                'status' => 'action_required',
+                                'payment_method' => [
+                                    'id' => 'pix',
+                                    'qr_code' => '000201PIX',
+                                ],
                             ],
                         ],
-                    ],
-                    'type_response' => [
-                        'qr_data' => '000201PIX',
                     ],
                 ], 201)
                 ->push([
                     'id' => 'ORD55443322',
                     'status' => 'processed',
-                    'type' => 'qr',
+                    'type' => 'online',
                     'transactions' => [
                         'payments' => [
                             [
                                 'id' => 'PAY55443322',
                                 'status' => 'approved',
                                 'status_detail' => 'accredited',
-                                'amount' => '32.00',
                             ],
                         ],
                     ],

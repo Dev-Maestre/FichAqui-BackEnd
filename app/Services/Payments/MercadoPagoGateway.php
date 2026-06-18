@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentGateway;
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\GatewayPaymentResult;
+use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
 use Illuminate\Http\Client\PendingRequest;
@@ -17,6 +18,40 @@ class MercadoPagoGateway implements PaymentGateway
     public function isConfigured(): bool
     {
         return $this->accessToken() !== null && $this->accessToken() !== '';
+    }
+
+    public function createOnlinePixOrder(OnlineOrderRequest $request): GatewayPaymentResult
+    {
+        $this->ensureConfigured();
+
+        $amount = $this->formatAmount($request->amount);
+        $firstName = Str::before(trim($request->payerName ?? 'Consumidor'), ' ');
+
+        $body = [
+            'type' => 'online',
+            'external_reference' => Str::limit($request->externalReference, 64, ''),
+            'total_amount' => $amount,
+            'payer' => [
+                'email' => $request->payerEmail,
+                'first_name' => $firstName !== '' ? $firstName : 'Consumidor',
+            ],
+            'transactions' => [
+                'payments' => [
+                    [
+                        'amount' => $amount,
+                        'payment_method' => [
+                            'id' => 'pix',
+                            'type' => 'bank_transfer',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $response = $this->client($request->idempotencyKey)->post('/v1/orders', $body);
+        $response->throw();
+
+        return $this->mapOrderResponse($response->json());
     }
 
     public function createQrOrder(QrOrderRequest $request): GatewayPaymentResult
@@ -147,16 +182,7 @@ class MercadoPagoGateway implements PaymentGateway
         $orderStatus = (string) ($payload['status'] ?? 'created');
         $normalizedStatus = $this->normalizeOrderPaymentStatus($orderStatus, $paymentStatus);
 
-        $qrData = data_get($payload, 'type_response.qr_data');
-        $pix = null;
-
-        if (is_string($qrData) && $qrData !== '') {
-            $pix = [
-                'qrCode' => null,
-                'copyPaste' => $qrData,
-                'expiresAt' => $this->expirationFromOrder($payload),
-            ];
-        }
+        $pix = $this->extractPixFromOrderPayload($payload);
 
         return new GatewayPaymentResult(
             gatewayPaymentId: $paymentId !== '' ? $paymentId : (string) ($payload['id'] ?? ''),
@@ -166,6 +192,41 @@ class MercadoPagoGateway implements PaymentGateway
             raw: $payload,
             gatewayOrderId: (string) ($payload['id'] ?? ''),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{qrCode: string|null, copyPaste: string, expiresAt: string|null}|null
+     */
+    private function extractPixFromOrderPayload(array $payload): ?array
+    {
+        $paymentMethod = data_get($payload, 'transactions.payments.0.payment_method', []);
+
+        if (is_array($paymentMethod)) {
+            $copyPaste = $paymentMethod['qr_code'] ?? null;
+
+            if (is_string($copyPaste) && $copyPaste !== '') {
+                $qrCode = $paymentMethod['qr_code_base64'] ?? null;
+
+                return [
+                    'qrCode' => is_string($qrCode) && $qrCode !== '' ? $qrCode : null,
+                    'copyPaste' => $copyPaste,
+                    'expiresAt' => $this->expirationFromOrder($payload),
+                ];
+            }
+        }
+
+        $qrData = data_get($payload, 'type_response.qr_data');
+
+        if (is_string($qrData) && $qrData !== '') {
+            return [
+                'qrCode' => null,
+                'copyPaste' => $qrData,
+                'expiresAt' => $this->expirationFromOrder($payload),
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -211,7 +272,12 @@ class MercadoPagoGateway implements PaymentGateway
             return 'rejected';
         }
 
-        if (in_array($paymentStatus, ['created', 'ready_to_process', 'in_process', 'pending'], true)) {
+        if (in_array($paymentStatus, ['created', 'ready_to_process', 'in_process', 'pending', 'action_required', 'waiting_transfer'], true)) {
+            return 'pending';
+        }
+
+        if (in_array($orderStatus, ['action_required', 'waiting_transfer', 'created'], true)
+            && ! in_array($paymentStatus, ['rejected', 'cancelled', 'canceled', 'approved'], true)) {
             return 'pending';
         }
 

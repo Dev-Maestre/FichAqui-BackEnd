@@ -31,14 +31,14 @@ return [
     | PIX via Orders API (QR Code)
     |--------------------------------------------------------------------------
     |
-    | pix_driver: "payments" (POST /v1/payments, PIX in-app ? padrao) ou "orders" (QR POS)
-    | qr_mode: dynamic | static | hybrid (somente driver orders)
-    | qr_expiration: duracao ISO 8601 (min 30s, max 3600h; padrao MP 15min)
-    | qr_external_pos_id: obrigatorio para driver "orders" (cadastro de caixa no MP)
+    | pix_driver:
+    |   online   => POST /v1/orders type:online (PIX in-app, padrao)
+    |   payments => POST /v1/payments (legado)
+    |   orders / qr_pos => POST /v1/orders type:qr + MP_QR_EXTERNAL_POS_ID (caixa fisico)
     |
     */
 
-    'pix_driver' => env('MP_PIX_DRIVER', 'payments'),
+    'pix_driver' => env('MP_PIX_DRIVER', 'online'),
 
     'qr_mode' => env('MP_QR_MODE', 'dynamic'),
 

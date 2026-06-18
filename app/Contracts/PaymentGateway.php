@@ -4,12 +4,15 @@ namespace App\Contracts;
 
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\GatewayPaymentResult;
+use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
 
 interface PaymentGateway
 {
     public function isConfigured(): bool;
+
+    public function createOnlinePixOrder(OnlineOrderRequest $request): GatewayPaymentResult;
 
     public function createQrOrder(QrOrderRequest $request): GatewayPaymentResult;
 
