@@ -1,0 +1,1293 @@
+openapi: 3.0.3
+info:
+  title: FichAqui API
+  description: |
+    API REST do FichAqui ? cardapio, eventos, estabelecimentos, barracas e pedidos.
+
+    **Autenticacao:** rotas protegidas usam Bearer token (Laravel Sanctum).
+    Obtenha o token via `POST /api/auth/login`.
+  version: 1.0.0
+  contact:
+    name: FichAqui
+
+servers:
+  - url: /
+    description: Mesma maquina que serviu o Swagger (funciona na rede local)
+  - url: http://localhost:8000
+    description: Apenas nesta maquina
+
+tags:
+  - name: Sistema
+  - name: Autenticacao
+  - name: Bootstrap
+  - name: Eventos
+  - name: Pedidos
+  - name: Fichas
+  - name: Pagamentos
+
+paths:
+  /api/health:
+    get:
+      tags: [Sistema]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API operacional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: FichAqui API
+
+  /api/bootstrap:
+    get:
+      tags: [Bootstrap]
+      summary: Dados iniciais para o front-end
+      description: |
+        Retorna o catálogo global (`categories`, `catalogProducts`).
+        Equivalente a `GET /api/catalog`.
+      operationId: bootstrap
+      responses:
+        '200':
+          description: Catálogo global
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogResponse'
+
+  /api/catalog:
+    get:
+      tags: [Bootstrap]
+      summary: Catálogo global da plataforma
+      description: Alias do contrato de catálogo (`categories` + `catalogProducts`), sem chaves legadas.
+      operationId: catalog
+      responses:
+        '200':
+          description: Catálogo global
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogResponse'
+
+  /api/payments/config:
+    get:
+      tags: [Pagamentos]
+      summary: Configuracao publica do Mercado Pago (MercadoPago.js)
+      description: |
+        Retorna a Public Key e flags para inicializar o SDK client-side:
+        `const mp = new MercadoPago(publicKey)`.
+        Nao expoe o Access Token.
+      operationId: paymentConfig
+      responses:
+        '200':
+          description: Configuracao para o front-end
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentClientConfig'
+
+  /api/auth/login:
+    post:
+      tags: [Autenticacao]
+      summary: Login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token e usuario autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '422':
+          description: Credenciais invalidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/auth/me:
+    get:
+      tags: [Autenticacao]
+      summary: Usuario autenticado
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dados do usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/logout:
+    post:
+      tags: [Autenticacao]
+      summary: Logout
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sessao encerrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/wallet:
+    get:
+      tags: [Autenticacao]
+      summary: Carteira do usuario
+      operationId: userWallet
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Saldo e cartoes salvos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/pedidos:
+    get:
+      tags: [Pedidos]
+      summary: Historico de pedidos do usuario
+      operationId: userPedidos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: include_fichas
+          in: query
+          schema:
+            type: boolean
+          description: Incluir array de fichas em cada pedido
+      responses:
+        '200':
+          description: Pedidos do usuario autenticado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/fichas:
+    get:
+      tags: [Pedidos]
+      summary: Fichas disponiveis do usuario
+      operationId: userFichas
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Fichas com status available
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ficha'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/events:
+    get:
+      tags: [Eventos]
+      summary: Listar eventos e estabelecimentos
+      operationId: listEvents
+      parameters:
+        - $ref: '#/components/parameters/cityId'
+        - name: public_only
+          in: query
+          schema:
+            type: boolean
+          description: Apenas status published ou active
+        - name: organizer_id
+          in: query
+          schema:
+            type: string
+          description: Filtra por organizador; inclui arquivados se o Bearer for do dono
+        - name: events_only
+          in: query
+          schema:
+            type: boolean
+          description: Apenas registros com data (eventos)
+        - name: establishments_only
+          in: query
+          schema:
+            type: boolean
+          description: Apenas registros sem data (estabelecimentos)
+      responses:
+        '200':
+          description: Lista de eventos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+    post:
+      tags: [Eventos]
+      summary: Criar evento ou estabelecimento
+      operationId: createEvent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          description: Evento criado com barraca e produto padrao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateEventResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/events/{eventId}:
+    get:
+      tags: [Eventos]
+      summary: Detalhe de um evento
+      operationId: getEvent
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      responses:
+        '200':
+          description: Evento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Eventos]
+      summary: Atualizar evento ou estabelecimento
+      operationId: updateEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Evento atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/events/{eventId}/stalls:
+    get:
+      tags: [Eventos]
+      summary: Barracas do evento
+      operationId: listStalls
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      responses:
+        '200':
+          description: Lista de barracas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Stall'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Eventos]
+      summary: Criar barraca no evento
+      operationId: createStall
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStallRequest'
+      responses:
+        '201':
+          description: Barraca criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stall'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/events/{eventId}/stalls/{stallId}:
+    patch:
+      tags: [Eventos]
+      summary: Atualizar barraca
+      operationId: updateStall
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+        - $ref: '#/components/parameters/stallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStallRequest'
+      responses:
+        '200':
+          description: Barraca atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stall'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/events/{eventId}/offerings:
+    get:
+      tags: [Eventos]
+      summary: Ofertas do evento
+      operationId: listOfferings
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      responses:
+        '200':
+          description: Ofertas com variantes e precos por barraca
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Offering'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/events/{eventId}/stalls/{stallId}/offerings:
+    put:
+      tags: [Eventos]
+      summary: Substituir cardapio da barraca
+      operationId: replaceStallOfferings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+        - $ref: '#/components/parameters/stallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/UpsertOfferingRequest'
+      responses:
+        '200':
+          description: Ofertas atualizadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Offering'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/events/{eventId}/pedidos:
+    get:
+      tags: [Pedidos]
+      summary: Listar pedidos do evento (painel admin)
+      operationId: listPedidos
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      responses:
+        '200':
+          description: Lista de pedidos com resumo e contagem de fichas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Pedidos]
+      summary: Criar pedido
+      operationId: createPedido
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Pedido criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Item indisponivel ou invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/fichas:
+    get:
+      tags: [Fichas]
+      summary: Buscar ficha por QR (scanner)
+      operationId: lookupFichaByQr
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: qr
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ficha encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ficha'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/fichas/{fichaId}/status:
+    patch:
+      tags: [Fichas]
+      summary: Marcar ficha como entregue
+      operationId: updateFichaStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fichaId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: qr
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opcional; resolve a ficha pelo QR em vez do ID no path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [delivered]
+      responses:
+        '200':
+          description: Ficha atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ficha'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/fichas/{fichaId}/consume:
+    post:
+      tags: [Fichas]
+      summary: Consumir ficha (atalho sem body)
+      operationId: consumeFicha
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fichaId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: qr
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ficha marcada como delivered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ficha'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+      description: Token retornado por POST /api/auth/login
+
+  parameters:
+    eventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: '1'
+    pedidoId:
+      name: pedidoId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: pedido-1
+    stallId:
+      name: stallId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: stall-1
+    cityId:
+      name: city_id
+      in: query
+      schema:
+        type: string
+      example: curitiba-pr
+
+  responses:
+    Unauthorized:
+      description: Nao autenticado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageError'
+    NotFound:
+      description: Recurso nao encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageError'
+    Forbidden:
+      description: Sem permissao
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageError'
+    ValidationError:
+      description: Dados invalidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+  schemas:
+    MessageError:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: maria@email.com
+        password:
+          type: string
+          format: password
+          example: '123456'
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: 1|abc123...
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: user-maria
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [consumer, admin, organizer, stall_manager]
+          description: Papel principal derivado de roles[] (maior privilégio)
+        roles:
+          type: array
+          deprecated: true
+          description: Alias legado durante transição; preferir `role`
+          items:
+            type: string
+            enum: [client, organizer, admin, stall_manager]
+        organizerId:
+          type: string
+          nullable: true
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          description: Vazio quando for estabelecimento
+          example: '2026-06-24'
+        startTime:
+          type: string
+          example: '18:00'
+        endTime:
+          type: string
+          example: '23:00'
+        location:
+          type: string
+        cityId:
+          type: string
+        organizerId:
+          type: string
+        banner:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, active, finished, archived]
+        capacity:
+          type: integer
+        primaryColor:
+          type: string
+        code:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        isEstablishment:
+          type: boolean
+          description: true quando date/startTime/endTime estao vazios
+
+    CreateEventRequest:
+      type: object
+      required: [name, cityId, location]
+      properties:
+        name:
+          type: string
+        cityId:
+          type: string
+        location:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+          description: Omita ou envie vazio para criar Estabelecimento
+        startTime:
+          type: string
+          example: '18:00'
+        endTime:
+          type: string
+          example: '23:00'
+        banner:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, active, finished, archived]
+          default: draft
+        capacity:
+          type: integer
+          default: 0
+        primaryColor:
+          type: string
+          default: '#d97706'
+        code:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+
+    UpdateEventRequest:
+      type: object
+      description: PATCH parcial; envie apenas os campos que mudam
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+        endTime:
+          type: string
+        location:
+          type: string
+        cityId:
+          type: string
+        banner:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, active, finished, archived]
+        capacity:
+          type: integer
+        primaryColor:
+          type: string
+        code:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+
+    CreateEventResponse:
+      type: object
+      properties:
+        event:
+          $ref: '#/components/schemas/Event'
+        stalls:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stall'
+        offerings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Offering'
+
+    Stall:
+      type: object
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        responsible:
+          type: string
+        color:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+        stock:
+          type: integer
+
+    CreateStallRequest:
+      type: object
+      required: [name, category, responsible, color]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        responsible:
+          type: string
+        color:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+          default: open
+        stock:
+          type: integer
+          default: 0
+
+    UpdateStallRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        responsible:
+          type: string
+        color:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+        stock:
+          type: integer
+
+    Offering:
+      type: object
+      properties:
+        id:
+          type: string
+          example: offering-1-stall-1-pastel
+        eventId:
+          type: string
+        stallId:
+          type: string
+        productId:
+          type: string
+          description: ID do produto no catalogo global
+        available:
+          type: boolean
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/OfferingVariant'
+
+    OfferingVariant:
+      type: object
+      properties:
+        templateId:
+          type: string
+          description: Slug do template no catalogo (ex. carne, unidade)
+        price:
+          type: number
+          format: float
+        available:
+          type: boolean
+        badge:
+          type: string
+          nullable: true
+
+    UpsertOfferingRequest:
+      type: object
+      required: [productId, variants]
+      properties:
+        productId:
+          type: string
+        available:
+          type: boolean
+          default: true
+        variants:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OfferingVariant'
+
+    Ficha:
+      type: object
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        itemName:
+          type: string
+        itemImage:
+          type: string
+        stallId:
+          type: string
+        stallName:
+          type: string
+        qrCode:
+          type: string
+        status:
+          type: string
+          enum: [available, delivered]
+
+    MenuVariant:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        price:
+          type: number
+          format: float
+        available:
+          type: boolean
+        badge:
+          type: string
+          nullable: true
+
+    MenuProduct:
+      type: object
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        image:
+          type: string
+        badge:
+          type: string
+          nullable: true
+        available:
+          type: boolean
+        stallId:
+          type: string
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuVariant'
+
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+        image:
+          type: string
+        badge:
+          type: string
+          nullable: true
+        available:
+          type: boolean
+        stallId:
+          type: string
+        variantLabel:
+          type: string
+
+    OrderItem:
+      type: object
+      properties:
+        item:
+          $ref: '#/components/schemas/MenuItem'
+        quantity:
+          type: integer
+          minimum: 1
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        number:
+          type: string
+        items:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/OrderItem'
+              - $ref: '#/components/schemas/OrderSummaryItem'
+        fichas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ficha'
+        total:
+          type: number
+        status:
+          type: string
+          enum: [available, delivered]
+        createdAt:
+          type: string
+          format: date-time
+        qrCode:
+          type: string
+
+    AdminOrder:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          properties:
+            fichaCounts:
+              type: object
+              properties:
+                available:
+                  type: integer
+                delivered:
+                  type: integer
+
+    OrderSummaryItem:
+      type: object
+      properties:
+        name:
+          type: string
+        quantity:
+          type: integer
+        stallName:
+          type: string
+
+    WalletResponse:
+      type: object
+      properties:
+        balance:
+          type: number
+          format: float
+        savedCards:
+          type: array
+          items:
+            $ref: '#/components/schemas/SavedCard'
+
+    SavedCard:
+      type: object
+      properties:
+        id:
+          type: string
+        brand:
+          type: string
+        lastFour:
+          type: string
+        holderName:
+          type: string
+        isDefault:
+          type: boolean
+
+    PaymentClientConfig:
+      type: object
+      description: Dados para inicializar MercadoPago.js v2 no browser.
+      properties:
+        enabled:
+          type: boolean
+          description: false se MP_PUBLIC_KEY nao estiver configurada
+        publicKey:
+          type: string
+          nullable: true
+          example: TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        sandbox:
+          type: boolean
+        locale:
+          type: string
+          example: pt-BR
+
+    CreateOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [quantity]
+            properties:
+              offeringId:
+                type: string
+                description: ID da oferta (checkout novo)
+              variantId:
+                type: string
+                description: Slug do template no catalogo
+                example: carne
+              quantity:
+                type: integer
+                minimum: 1
+                example: 1
+        paymentMethod:
+          type: string
+          enum: [credit_card, pix, wallet]
+        cardId:
+          type: string
+          nullable: true
+          description: Cartao salvo local (stub ou gateway_token futuro)
+        cardToken:
+          type: string
+          nullable: true
+          description: Token gerado pelo MercadoPago.js no browser
+        paymentMethodId:
+          type: string
+          nullable: true
+          example: visa
+          description: Bandeira retornada pelo SDK (obrigatorio com cardToken)
+        installments:
+          type: integer
+          minimum: 1
+          default: 1
+
+    CatalogResponse:
+      type: object
+      required: [categories, catalogProducts]
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        catalogProducts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogProduct'
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          example: comidas
+        name:
+          type: string
+          example: Comidas
+        icon:
+          type: string
+          example: UtensilsCrossed
+        color:
+          type: string
+          example: '#ef4444'
+
+    CatalogProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pastel
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          description: ID da categoria
+          example: comidas
+        image:
+          type: string
+        badge:
+          type: string
+          nullable: true
+        variantTemplates:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariantTemplate'
+
+    VariantTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          example: carne
+        label:
+          type: string
+          example: Carne
