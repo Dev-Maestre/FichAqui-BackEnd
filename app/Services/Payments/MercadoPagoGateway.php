@@ -372,7 +372,7 @@ class MercadoPagoGateway implements PaymentGateway
 
     private function normalizeOrderPaymentStatus(string $orderStatus, string $paymentStatus): string
     {
-        if ($paymentStatus === 'approved') {
+        if (in_array($paymentStatus, ['approved', 'processed'], true)) {
             return 'approved';
         }
 
@@ -389,11 +389,11 @@ class MercadoPagoGateway implements PaymentGateway
         }
 
         if (in_array($orderStatus, ['action_required', 'waiting_transfer', 'created'], true)
-            && ! in_array($paymentStatus, ['rejected', 'cancelled', 'canceled', 'approved'], true)) {
+            && ! in_array($paymentStatus, ['rejected', 'cancelled', 'canceled', 'approved', 'processed'], true)) {
             return 'pending';
         }
 
-        if ($orderStatus === 'processed' && $paymentStatus === 'approved') {
+        if ($orderStatus === 'processed') {
             return 'approved';
         }
 

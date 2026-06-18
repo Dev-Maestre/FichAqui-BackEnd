@@ -203,4 +203,37 @@ class MercadoPagoGatewayTest extends TestCase
                 && $request['transaction_amount'] === 16.0;
         });
     }
+
+    public function test_get_order_maps_processed_pix_payment_as_approved(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders/ORDTST01' => Http::response([
+                'id' => 'ORDTST01',
+                'status' => 'processed',
+                'status_detail' => 'accredited',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAY01TST',
+                            'status' => 'processed',
+                            'status_detail' => 'accredited',
+                            'payment_method' => ['id' => 'pix', 'type' => 'bank_transfer'],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+        $result = $gateway->getOrder('ORDTST01');
+
+        $this->assertTrue($result->isApproved());
+        $this->assertSame('PAY01TST', $result->gatewayPaymentId);
+    }
 }
