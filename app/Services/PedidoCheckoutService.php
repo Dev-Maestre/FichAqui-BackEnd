@@ -294,7 +294,7 @@ class PedidoCheckoutService
             ]);
         }
 
-        $driver = (string) config('mercadopago.pix_driver', 'orders');
+        $driver = $this->resolvePixDriver();
 
         if ($driver === 'orders') {
             $result = $this->paymentGateway->createQrOrder(new QrOrderRequest(
@@ -313,6 +313,23 @@ class PedidoCheckoutService
         }
 
         return $this->mapGatewayResult($result, includePix: true);
+    }
+
+    private function resolvePixDriver(): string
+    {
+        $driver = (string) config('mercadopago.pix_driver', 'payments');
+
+        if ($driver !== 'orders') {
+            return 'payments';
+        }
+
+        $posId = config('mercadopago.qr_external_pos_id');
+
+        if (is_string($posId) && $posId !== '') {
+            return 'orders';
+        }
+
+        return 'payments';
     }
 
     /**
