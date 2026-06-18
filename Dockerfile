@@ -12,4 +12,4 @@ RUN apt-get update \
 
 WORKDIR /var/www/html
 
-EXPOSE 8000
+EXPOSE 8001

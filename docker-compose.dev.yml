@@ -1,0 +1,15 @@
+# Desenvolvimento local: portas no host + bind mount do codigo
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  postgres:
+    container_name: fichaqui-postgres
+    ports:
+      - "5433:5432"
+
+  api:
+    container_name: fichaqui-api
+    ports:
+      - "${APP_PORT:-8001}:${APP_PORT:-8001}"
+    volumes:
+      - .:/var/www/html
