@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-fich_aqui}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
     ports:
-      - "5433:5433"
+      - "5433:5432"
     volumes:
       - fichaqui_postgres_data:/var/lib/postgresql/data
     healthcheck:
