@@ -4,59 +4,45 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-
     environment:
       POSTGRES_DB: ${DB_DATABASE:-fich_aqui}
       POSTGRES_USER: ${DB_USERNAME:-fich_aqui}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
-
+    ports:
+      - "5433:5432"
     volumes:
       - fichaqui_postgres_data:/var/lib/postgresql/data
-
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U ${DB_USERNAME:-fich_aqui} -d ${DB_DATABASE:-fich_aqui}
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-fich_aqui} -d ${DB_DATABASE:-fich_aqui}"]
       interval: 5s
       timeout: 5s
       retries: 10
-
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
-
     restart: unless-stopped
-
     depends_on:
       postgres:
         condition: service_healthy
-
-    # libera a porta para acesso externo
     ports:
-      - "8001:8001"
-
+      - "${APP_PORT:-8001}:${APP_PORT:-8001}"
     env_file:
       - .env
-
     environment:
       APP_ENV: production
       APP_DEBUG: false
-      APP_URL: http://92.113.32.38:8001
-
+      APP_URL: https://fichaqui.baiacubo.tech
+      DB_HOST: postgres
+      DB_PORT: 5432
     command: >
-      sh -c "
-      if [ ! -f vendor/autoload.php ]; then
-        composer install --no-interaction --prefer-dist ${COMPOSER_INSTALL_FLAGS:-};
-      fi &&
-      php artisan package:discover --ansi || true &&
-      php artisan config:clear --no-interaction &&
-      php artisan migrate --force --no-interaction &&
-      php artisan db:seed --force --no-interaction || true &&
-      php artisan serve --host=0.0.0.0 --port=8001
-      "
-
+      sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist ${COMPOSER_INSTALL_FLAGS:-}; fi &&
+             php artisan package:discover --ansi || true &&
+             php artisan config:clear --no-interaction &&
+             php artisan migrate --force --no-interaction &&
+             php artisan db:seed --force --no-interaction || true &&
+             php artisan serve --host=0.0.0.0 --port=$${APP_PORT:-8001}"
 
 volumes:
   fichaqui_postgres_data:
