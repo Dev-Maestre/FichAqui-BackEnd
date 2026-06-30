@@ -71,6 +71,8 @@ class FichaquiSeeder extends Seeder
 
     private function eventos(): array
     {
+        // Picsum Photos é uma API de imagens aleatórias gratuita, ideal para o MVP.
+        // Usamos seeds determinísticos para que os banners e ícones de cada evento sejam consistentes.
         return [
             [
                 'id' => '1',
@@ -86,11 +88,11 @@ class FichaquiSeeder extends Seeder
                 'latitude' => -25.4284,
                 'longitude' => -49.2733,
                 'organizer_id' => 'org-paroquia',
-                'banner' => '/festa-banner.jpg',
+                'banner' => 'https://picsum.photos/seed/event-1-banner/800/400',
                 'status' => 'published',
                 'capacity' => 500,
                 'primary_color' => '#d97706',
-                'icon' => 'festa',
+                'icon' => 'https://picsum.photos/seed/event-1-icon/100/100',
             ],
             [
                 'id' => '2',
@@ -106,11 +108,11 @@ class FichaquiSeeder extends Seeder
                 'latitude' => -25.4300,
                 'longitude' => -49.2700,
                 'organizer_id' => 'org-paroquia',
-                'banner' => '/natal-banner.jpg',
+                'banner' => 'https://picsum.photos/seed/event-2-banner/800/400',
                 'status' => 'published',
                 'capacity' => 300,
                 'primary_color' => '#dc2626',
-                'icon' => 'natal',
+                'icon' => 'https://picsum.photos/seed/event-2-icon/100/100',
             ],
             [
                 'id' => 'estabelecimento-paroquia',
@@ -126,11 +128,11 @@ class FichaquiSeeder extends Seeder
                 'latitude' => null,
                 'longitude' => null,
                 'organizer_id' => 'org-paroquia',
-                'banner' => '/festa-banner.jpg',
+                'banner' => 'https://picsum.photos/seed/event-cantina-banner/800/400',
                 'status' => 'active',
                 'capacity' => 80,
                 'primary_color' => '#16a34a',
-                'icon' => 'cantina',
+                'icon' => 'https://picsum.photos/seed/event-cantina-icon/100/100',
             ],
         ];
     }
