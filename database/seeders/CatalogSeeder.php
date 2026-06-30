@@ -158,12 +158,16 @@ class CatalogSeeder extends Seeder
         ?string $badge,
         array $variantTemplates,
     ): array {
+        // Picsum Photos é uma API de imagens aleatórias gratuita, ideal para o MVP enquanto o backend não suporta upload de imagens reais.
+        // Usamos um seed baseado no ID do produto para manter a consistência da imagem em cada recarga/visualização.
+        $imageUrl = "https://picsum.photos/seed/{$id}/400/400";
+
         return [
             'id' => $id,
             'categoria_id' => $categoriaId,
             'name' => $name,
             'description' => $description,
-            'image' => $image,
+            'image' => $imageUrl,
             'badge' => $badge,
             'variant_templates' => $variantTemplates,
         ];
