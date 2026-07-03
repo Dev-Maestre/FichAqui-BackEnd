@@ -42,7 +42,7 @@ class FichaquiSeeder extends Seeder
         return [
             [
                 'external_id' => 'user-maria',
-                'email' => 'test_user_5207637493757128652@testuser.com',
+                'email' => 'maria@testuser.com',
                 'password' => '123456',
                 'name' => 'Maria Silva',
                 'roles' => ['client'],

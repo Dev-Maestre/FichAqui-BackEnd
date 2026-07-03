@@ -364,4 +364,166 @@ class Adr0004HandoffTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['cpf']);
     }
+
+    public function test_card_token_approved_checkout_generates_fichas(): void
+    {
+        config($this->mercadoPagoTestConfig());
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders*' => Http::response([
+                'id' => 'ORDCARD99',
+                'status' => 'processed',
+                'status_detail' => 'accredited',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYCARD99',
+                            'status' => 'processed',
+                            'status_detail' => 'accredited',
+                            'payment_method' => [
+                                'id' => 'visa',
+                                'type' => 'credit_card',
+                                'installments' => 1,
+                            ],
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 2],
+            ],
+            'paymentMethod' => 'credit_card',
+            'cardToken' => 'tok_test_card',
+            'paymentMethodId' => 'visa',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('status', 'available')
+            ->assertJsonPath('paymentStatus', 'paid')
+            ->assertJsonPath('paymentId', 'PAYCARD99')
+            ->assertJsonPath('gatewayOrderId', 'ORDCARD99')
+            ->assertJsonCount(2, 'fichas');
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.mercadopago.com/v1/orders'
+            && ($request['transactions']['payments'][0]['payment_method']['type'] ?? null) === 'credit_card'
+            && ($request['transactions']['payments'][0]['payment_method']['token'] ?? null) === 'tok_test_card'
+            && ! isset($request['shipment']));
+    }
+
+    public function test_card_token_pending_checkout_has_no_fichas(): void
+    {
+        config($this->mercadoPagoTestConfig());
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders*' => Http::response([
+                'id' => 'ORDCARD88',
+                'status' => 'processing',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYCARD88',
+                            'status' => 'in_process',
+                            'payment_method' => [
+                                'id' => 'master',
+                                'type' => 'credit_card',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 1],
+            ],
+            'paymentMethod' => 'credit_card',
+            'cardToken' => 'tok_test_pending',
+            'paymentMethodId' => 'master',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('status', 'pending_payment')
+            ->assertJsonPath('paymentStatus', 'pending')
+            ->assertJsonPath('paymentId', 'PAYCARD88')
+            ->assertJsonPath('gatewayOrderId', 'ORDCARD88')
+            ->assertJsonCount(0, 'fichas');
+
+        $this->assertDatabaseCount('fichas', 0);
+    }
+
+    public function test_card_id_with_mercado_pago_configured_returns_422(): void
+    {
+        config($this->mercadoPagoTestConfig());
+
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 1],
+            ],
+            'paymentMethod' => 'credit_card',
+            'cardId' => 'card-1',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['cardId']);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_card_token_rejected_returns_422_without_pedido(): void
+    {
+        config($this->mercadoPagoTestConfig());
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders*' => Http::response([
+                'id' => 'ORDCARD77',
+                'status' => 'failed',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYCARD77',
+                            'status' => 'rejected',
+                            'status_detail' => 'cc_rejected_insufficient_amount',
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 1],
+            ],
+            'paymentMethod' => 'credit_card',
+            'cardToken' => 'tok_test_rejected',
+            'paymentMethodId' => 'visa',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['paymentMethod']);
+
+        $this->assertDatabaseCount('pedidos', 0);
+    }
 }

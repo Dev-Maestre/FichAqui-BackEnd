@@ -64,7 +64,7 @@ Compra em um Evento ou Estabelecimento, identificada por número. Enquanto o pag
 _Avoid_: Order, compra, transação
 
 **Pagamento pendente**:
-Estado em que o Pedido foi criado mas o gateway ainda não confirmou o pagamento (ex.: PIX aguardando). Nenhuma Ficha é emitida.
+Estado em que o Pedido foi criado mas o gateway ainda não confirmou o pagamento — PIX aguardando transferência ou cartão em análise/processamento no Mercado Pago. Nenhuma Ficha é emitida até **pagamento confirmado** (webhook ou poll).
 _Avoid_: Pending order, aguardando
 
 **Pagamento recusado**:

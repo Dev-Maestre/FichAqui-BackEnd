@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\PaymentGateway;
-use App\Data\Payments\CardPaymentRequest;
+use App\Data\Payments\CardOnlineOrderRequest;
 use App\Data\Payments\GatewayPaymentResult;
 use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
@@ -193,12 +193,14 @@ class PedidoCheckoutService
         return match ($method) {
             'credit_card' => $this->processCreditCard(
                 $user,
+                $evento,
                 $cardId,
                 $cardToken,
                 $paymentMethodId,
                 $installments,
                 $total,
                 $idempotencyKey,
+                $lines,
             ),
             'wallet' => ['paymentStatus' => $this->processWallet($user, $total)],
             'pix' => $this->processPix($user, $evento, $total, $idempotencyKey, $lines),
@@ -241,16 +243,19 @@ class PedidoCheckoutService
     }
 
     /**
-     * @return array{paymentStatus: string, gatewayPaymentId?: string|null}
+     * @param  Collection<int, array{variante: OfertaVariante, quantity: int, unitPrice: float, itemName: string, stallName: string, category: string, image: string}>  $lines
+     * @return array{paymentStatus: string, gatewayPaymentId?: string|null, gatewayOrderId?: string|null}
      */
     private function processCreditCard(
         User $user,
+        Evento $evento,
         ?string $cardId,
         ?string $cardToken,
         ?string $paymentMethodId,
         int $installments,
         float $total,
         string $idempotencyKey,
+        Collection $lines,
     ): array {
         if ($cardToken !== null && $cardToken !== '') {
             if (! $this->paymentGateway->isConfigured()) {
@@ -259,17 +264,37 @@ class PedidoCheckoutService
                 ]);
             }
 
-            $result = $this->paymentGateway->createCardPayment(new CardPaymentRequest(
-                idempotencyKey: $idempotencyKey,
-                amount: $total,
-                description: 'Pedido FichAqui',
-                payerEmail: $user->email,
-                token: $cardToken,
-                installments: $installments,
-                paymentMethodId: $paymentMethodId ?? 'visa',
-            ));
+            $this->assertSandboxPayerEmail($user);
+
+            try {
+                $result = $this->paymentGateway->createOnlineCardOrder(new CardOnlineOrderRequest(
+                    idempotencyKey: $idempotencyKey,
+                    amount: $total,
+                    externalReference: $this->sanitizeExternalReference($idempotencyKey),
+                    payerEmail: $user->email,
+                    token: $cardToken,
+                    paymentMethodId: $paymentMethodId ?? 'visa',
+                    installments: $installments,
+                    payerName: $user->name,
+                    payerCpf: $user->cpf,
+                    description: 'Pedido FichAqui - '.$evento->name,
+                    items: $this->buildMercadoPagoItems($lines),
+                ));
+            } catch (ValidationException $exception) {
+                throw $exception;
+            } catch (RequestException $exception) {
+                throw ValidationException::withMessages([
+                    'paymentMethod' => [MercadoPagoErrors::messageFromPayload($exception->response?->json())],
+                ]);
+            }
 
             return $this->mapGatewayResult($result);
+        }
+
+        if ($this->paymentGateway->isConfigured()) {
+            throw ValidationException::withMessages([
+                'cardId' => ['Pagamento com cartao salvo ainda nao disponivel. Use cardToken.'],
+            ]);
         }
 
         if ($cardId === null || $cardId === '') {

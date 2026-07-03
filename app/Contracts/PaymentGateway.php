@@ -2,6 +2,7 @@
 
 namespace App\Contracts;
 
+use App\Data\Payments\CardOnlineOrderRequest;
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\GatewayPaymentResult;
 use App\Data\Payments\OnlineOrderRequest;
@@ -13,6 +14,8 @@ interface PaymentGateway
     public function isConfigured(): bool;
 
     public function createOnlinePixOrder(OnlineOrderRequest $request): GatewayPaymentResult;
+
+    public function createOnlineCardOrder(CardOnlineOrderRequest $request): GatewayPaymentResult;
 
     public function createQrOrder(QrOrderRequest $request): GatewayPaymentResult;
 

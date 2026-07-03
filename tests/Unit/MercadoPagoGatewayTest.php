@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Data\Payments\CardOnlineOrderRequest;
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\QrOrderRequest;
@@ -167,7 +168,117 @@ class MercadoPagoGatewayTest extends TestCase
         });
     }
 
-    public function test_create_card_payment_sends_token_to_mercado_pago(): void
+    public function test_create_online_card_order_sends_token_to_mercado_pago(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders' => Http::response([
+                'id' => 'ORDCARD01',
+                'status' => 'processed',
+                'status_detail' => 'accredited',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYCARD01',
+                            'status' => 'processed',
+                            'status_detail' => 'accredited',
+                            'payment_method' => [
+                                'id' => 'visa',
+                                'type' => 'credit_card',
+                                'installments' => 1,
+                            ],
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+
+        $result = $gateway->createOnlineCardOrder(new CardOnlineOrderRequest(
+            idempotencyKey: 'pedido-test-1',
+            amount: 16.0,
+            externalReference: 'pedido-test-1',
+            payerEmail: 'test_user_123@testuser.com',
+            token: 'card-token-from-mp-js',
+            paymentMethodId: 'visa',
+            installments: 1,
+            payerName: 'Maria Silva',
+            payerCpf: '52998224725',
+            items: [
+                ['title' => 'Pastel - Carne', 'unit_price' => '8.00', 'quantity' => 2],
+            ],
+        ));
+
+        $this->assertTrue($result->isApproved());
+        $this->assertSame('PAYCARD01', $result->gatewayPaymentId);
+        $this->assertSame('ORDCARD01', $result->gatewayOrderId);
+
+        Http::assertSent(function ($request) {
+            return $request->hasHeader('X-Idempotency-Key', 'pedido-test-1')
+                && $request['type'] === 'online'
+                && $request['processing_mode'] === 'automatic'
+                && ! isset($request['shipment'])
+                && $request['payer']['email'] === 'test_user_123@testuser.com'
+                && $request['payer']['identification']['type'] === 'CPF'
+                && $request['transactions']['payments'][0]['payment_method']['token'] === 'card-token-from-mp-js'
+                && $request['transactions']['payments'][0]['payment_method']['type'] === 'credit_card'
+                && $request['transactions']['payments'][0]['payment_method']['installments'] === 1
+                && $request['items'][0]['title'] === 'Pastel - Carne';
+        });
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/v1/payments'));
+    }
+
+    public function test_create_online_card_order_maps_in_process_as_pending(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders' => Http::response([
+                'id' => 'ORDCARD02',
+                'status' => 'processing',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYCARD02',
+                            'status' => 'in_process',
+                            'payment_method' => [
+                                'id' => 'master',
+                                'type' => 'credit_card',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+
+        $result = $gateway->createOnlineCardOrder(new CardOnlineOrderRequest(
+            idempotencyKey: 'pedido-test-2',
+            amount: 16.0,
+            externalReference: 'pedido-test-2',
+            payerEmail: 'test_user_123@testuser.com',
+            token: 'card-token-pending',
+            paymentMethodId: 'master',
+        ));
+
+        $this->assertTrue($result->isPending());
+        $this->assertSame('PAYCARD02', $result->gatewayPaymentId);
+        $this->assertSame('ORDCARD02', $result->gatewayOrderId);
+    }
+
+    public function test_create_card_payment_legacy_sends_token_to_payments_api(): void
     {
         config([
             'mercadopago.access_token' => 'TEST-access-token',

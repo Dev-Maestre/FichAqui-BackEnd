@@ -3,6 +3,7 @@
 namespace App\Services\Payments;
 
 use App\Contracts\PaymentGateway;
+use App\Data\Payments\CardOnlineOrderRequest;
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\GatewayPaymentResult;
 use App\Data\Payments\OnlineOrderRequest;
@@ -29,27 +30,6 @@ class MercadoPagoGateway implements PaymentGateway
         $this->ensureConfigured();
 
         $amount = $this->formatAmount($request->amount);
-        $firstName = Str::before(trim($request->payerName ?? 'Consumidor'), ' ');
-        $lastName = trim(Str::after(trim($request->payerName ?? ''), ' '));
-
-        $payer = [
-            'email' => $request->payerEmail,
-            'first_name' => $firstName !== '' ? $firstName : 'Consumidor',
-            'entity_type' => 'individual',
-        ];
-
-        if ($lastName !== '' && $lastName !== $firstName) {
-            $payer['last_name'] = $lastName;
-        }
-
-        $cpf = Cpf::digits($request->payerCpf);
-
-        if ($cpf !== null && Cpf::isValid($cpf)) {
-            $payer['identification'] = [
-                'type' => 'CPF',
-                'number' => $cpf,
-            ];
-        }
 
         $shipmentAddress = $this->normalizeShipmentAddress(
             $request->shipmentAddress !== []
@@ -63,7 +43,7 @@ class MercadoPagoGateway implements PaymentGateway
             'description' => Str::limit($request->description, 150, ''),
             'total_amount' => $amount,
             'processing_mode' => 'automatic',
-            'payer' => $payer,
+            'payer' => $this->buildPayer($request->payerEmail, $request->payerName, $request->payerCpf),
             'shipment' => [
                 'address' => $shipmentAddress,
             ],
@@ -82,18 +62,42 @@ class MercadoPagoGateway implements PaymentGateway
         ];
 
         if ($request->items !== []) {
-            $body['items'] = array_slice(
-                array_map(
-                    fn (array $item) => array_filter([
-                        'title' => isset($item['title']) ? Str::limit((string) $item['title'], 150, '') : null,
-                        'unit_price' => isset($item['unit_price']) ? (string) $item['unit_price'] : null,
-                        'quantity' => isset($item['quantity']) ? (int) $item['quantity'] : null,
-                    ], fn ($value) => $value !== null && $value !== ''),
-                    $request->items
-                ),
-                0,
-                10
-            );
+            $body['items'] = $this->buildOrderItems($request->items);
+        }
+
+        return $this->postOrder($body, $request->idempotencyKey);
+    }
+
+    public function createOnlineCardOrder(CardOnlineOrderRequest $request): GatewayPaymentResult
+    {
+        $this->ensureConfigured();
+
+        $amount = $this->formatAmount($request->amount);
+
+        $body = [
+            'type' => 'online',
+            'external_reference' => Str::limit($request->externalReference, 64, ''),
+            'description' => Str::limit($request->description, 150, ''),
+            'total_amount' => $amount,
+            'processing_mode' => 'automatic',
+            'payer' => $this->buildPayer($request->payerEmail, $request->payerName, $request->payerCpf),
+            'transactions' => [
+                'payments' => [
+                    [
+                        'amount' => $amount,
+                        'payment_method' => [
+                            'id' => $request->paymentMethodId,
+                            'type' => 'credit_card',
+                            'token' => $request->token,
+                            'installments' => $request->installments,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        if ($request->items !== []) {
+            $body['items'] = $this->buildOrderItems($request->items);
         }
 
         return $this->postOrder($body, $request->idempotencyKey);
@@ -425,6 +429,56 @@ class MercadoPagoGateway implements PaymentGateway
     private function formatAmount(float $amount): string
     {
         return number_format(round($amount, 2), 2, '.', '');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildPayer(string $payerEmail, ?string $payerName, ?string $payerCpf): array
+    {
+        $firstName = Str::before(trim($payerName ?? 'Consumidor'), ' ');
+        $lastName = trim(Str::after(trim($payerName ?? ''), ' '));
+
+        $payer = [
+            'email' => $payerEmail,
+            'first_name' => $firstName !== '' ? $firstName : 'Consumidor',
+            'entity_type' => 'individual',
+        ];
+
+        if ($lastName !== '' && $lastName !== $firstName) {
+            $payer['last_name'] = $lastName;
+        }
+
+        $cpf = Cpf::digits($payerCpf);
+
+        if ($cpf !== null && Cpf::isValid($cpf)) {
+            $payer['identification'] = [
+                'type' => 'CPF',
+                'number' => $cpf,
+            ];
+        }
+
+        return $payer;
+    }
+
+    /**
+     * @param  list<array{title: string, unit_price: string, quantity: int}>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function buildOrderItems(array $items): array
+    {
+        return array_slice(
+            array_map(
+                fn (array $item) => array_filter([
+                    'title' => isset($item['title']) ? Str::limit((string) $item['title'], 150, '') : null,
+                    'unit_price' => isset($item['unit_price']) ? (string) $item['unit_price'] : null,
+                    'quantity' => isset($item['quantity']) ? (int) $item['quantity'] : null,
+                ], fn ($value) => $value !== null && $value !== ''),
+                $items
+            ),
+            0,
+            10
+        );
     }
 
     private function accessToken(): ?string
