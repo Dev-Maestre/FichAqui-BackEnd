@@ -169,6 +169,66 @@ class Adr0004HandoffTest extends TestCase
         Http::assertNotSent(fn ($request) => str_contains($request->url(), '/v1/payments'));
     }
 
+    public function test_pix_processing_status_polls_until_qr_is_available(): void
+    {
+        config($this->mercadoPagoTestConfig());
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders*' => Http::sequence()
+                ->push([
+                    'id' => 'ORD55667788',
+                    'status' => 'processing',
+                    'type' => 'online',
+                    'transactions' => [
+                        'payments' => [
+                            [
+                                'id' => 'PAY55667788',
+                                'status' => 'processing',
+                                'status_detail' => 'in_process',
+                            ],
+                        ],
+                    ],
+                ], 201)
+                ->push([
+                    'id' => 'ORD55667788',
+                    'status' => 'action_required',
+                    'type' => 'online',
+                    'transactions' => [
+                        'payments' => [
+                            [
+                                'id' => 'PAY55667788',
+                                'status' => 'action_required',
+                                'payment_method' => [
+                                    'id' => 'pix',
+                                    'qr_code' => '000201PIXRETRY',
+                                    'qr_code_base64' => 'base64retry',
+                                ],
+                            ],
+                        ],
+                    ],
+                ], 200),
+        ]);
+
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 1],
+            ],
+            'paymentMethod' => 'pix',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('status', 'pending_payment')
+            ->assertJsonPath('paymentStatus', 'pending')
+            ->assertJsonPath('pixCopyPaste', '000201PIXRETRY')
+            ->assertJsonPath('pixQrCode', 'base64retry');
+
+        Http::assertSentCount(2);
+    }
+
     public function test_pix_orders_without_pos_falls_back_to_online(): void
     {
         config($this->mercadoPagoTestConfig([

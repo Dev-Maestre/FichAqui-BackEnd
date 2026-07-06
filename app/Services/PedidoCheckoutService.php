@@ -364,7 +364,39 @@ class PedidoCheckoutService
             ]);
         }
 
+        if ($result->isPending() && $result->pix === null) {
+            $result = $this->awaitPixQrCode($result);
+        }
+
         return $this->mapGatewayResult($result, includePix: true);
+    }
+
+    private function awaitPixQrCode(GatewayPaymentResult $result): GatewayPaymentResult
+    {
+        $maxAttempts = 4;
+        $delayMicroseconds = 400_000;
+
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            usleep($delayMicroseconds);
+
+            $refreshed = match (true) {
+                $result->gatewayOrderId !== null && $result->gatewayOrderId !== '' => $this->paymentGateway->getOrder($result->gatewayOrderId),
+                $result->gatewayPaymentId !== null && $result->gatewayPaymentId !== '' => $this->paymentGateway->getPayment($result->gatewayPaymentId),
+                default => null,
+            };
+
+            if ($refreshed === null) {
+                break;
+            }
+
+            $result = $refreshed;
+
+            if ($result->pix !== null || ! $result->isPending()) {
+                break;
+            }
+        }
+
+        return $result;
     }
 
     /**

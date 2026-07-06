@@ -365,9 +365,11 @@ class MercadoPagoGateway implements PaymentGateway
             ];
         }
 
+        $paymentStatus = (string) ($payload['status'] ?? 'pending');
+
         return new GatewayPaymentResult(
             gatewayPaymentId: (string) ($payload['id'] ?? ''),
-            status: (string) ($payload['status'] ?? 'pending'),
+            status: $this->normalizePaymentStatus($paymentStatus),
             statusDetail: isset($payload['status_detail']) ? (string) $payload['status_detail'] : null,
             pix: $pix,
             raw: $payload,
@@ -388,12 +390,38 @@ class MercadoPagoGateway implements PaymentGateway
             return 'rejected';
         }
 
-        if (in_array($paymentStatus, ['created', 'ready_to_process', 'in_process', 'pending', 'action_required', 'waiting_transfer'], true)) {
+        return $this->normalizePaymentStatus($paymentStatus, $orderStatus);
+    }
+
+    private function normalizePaymentStatus(string $paymentStatus, ?string $orderStatus = null): string
+    {
+        if (in_array($paymentStatus, ['approved', 'processed'], true)) {
+            return 'approved';
+        }
+
+        if (in_array($paymentStatus, ['rejected', 'cancelled', 'canceled'], true)) {
+            return 'rejected';
+        }
+
+        if (in_array($paymentStatus, [
+            'created',
+            'ready_to_process',
+            'in_process',
+            'processing',
+            'pending',
+            'action_required',
+            'waiting_transfer',
+        ], true)) {
             return 'pending';
         }
 
-        if (in_array($orderStatus, ['action_required', 'waiting_transfer', 'created'], true)
-            && ! in_array($paymentStatus, ['rejected', 'cancelled', 'canceled', 'approved', 'processed'], true)) {
+        if ($orderStatus !== null && in_array($orderStatus, [
+            'action_required',
+            'waiting_transfer',
+            'created',
+            'in_process',
+            'processing',
+        ], true) && ! in_array($paymentStatus, ['rejected', 'cancelled', 'canceled', 'approved', 'processed'], true)) {
             return 'pending';
         }
 

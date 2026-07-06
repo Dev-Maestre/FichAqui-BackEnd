@@ -116,6 +116,52 @@ class MercadoPagoGatewayTest extends TestCase
         ));
     }
 
+    public function test_create_online_pix_order_maps_processing_as_pending(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders' => Http::response([
+                'id' => 'ORDONLINE02',
+                'status' => 'processing',
+                'type' => 'online',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYONLINE02',
+                            'status' => 'processing',
+                            'status_detail' => 'in_process',
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+
+        $result = $gateway->createOnlinePixOrder(new OnlineOrderRequest(
+            idempotencyKey: 'pedido-online-2',
+            amount: 16.0,
+            externalReference: 'pedido-online-2',
+            payerEmail: 'test_user_123@testuser.com',
+            shipmentAddress: [
+                'zip_code' => '80010000',
+                'street_name' => 'Rua Teste',
+                'street_number' => '1',
+                'neighborhood' => 'Centro',
+                'city' => 'CURITIBA',
+                'state' => 'PR',
+            ],
+        ));
+
+        $this->assertTrue($result->isPending());
+        $this->assertSame('PAYONLINE02', $result->gatewayPaymentId);
+        $this->assertSame('in_process', $result->statusDetail);
+    }
+
     public function test_create_qr_order_sends_dynamic_order_to_mercado_pago(): void
     {
         config([

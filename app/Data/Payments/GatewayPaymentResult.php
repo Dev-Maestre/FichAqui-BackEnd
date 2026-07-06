@@ -26,6 +26,7 @@ readonly class GatewayPaymentResult
         return in_array($this->status, [
             'pending',
             'in_process',
+            'processing',
             'authorized',
             'created',
             'ready_to_process',
