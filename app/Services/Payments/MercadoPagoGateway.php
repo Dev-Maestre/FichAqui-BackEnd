@@ -87,7 +87,7 @@ class MercadoPagoGateway implements PaymentGateway
                         'amount' => $amount,
                         'payment_method' => [
                             'id' => $request->paymentMethodId,
-                            'type' => 'credit_card',
+                            'type' => $this->normalizeCardPaymentType($request->paymentMethodType),
                             'token' => $request->token,
                             'installments' => $request->installments,
                         ],
@@ -457,6 +457,11 @@ class MercadoPagoGateway implements PaymentGateway
     private function formatAmount(float $amount): string
     {
         return number_format(round($amount, 2), 2, '.', '');
+    }
+
+    private function normalizeCardPaymentType(string $type): string
+    {
+        return in_array($type, ['credit_card', 'debit_card'], true) ? $type : 'credit_card';
     }
 
     /**

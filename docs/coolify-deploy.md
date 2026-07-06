@@ -32,8 +32,12 @@ APP_KEY=base64:...
 MP_ACCESS_TOKEN=...
 MP_PUBLIC_KEY=...
 MP_WEBHOOK_URL=https://fichaqui.baiacubo.tech/webhook-mp
+MP_WEBHOOK_SECRET=<secret-do-painel-mp>
+MP_SANDBOX=false
 MP_PIX_DRIVER=online
 ```
+
+Cadastre `MP_WEBHOOK_URL` no painel Mercado Pago (Webhooks) com os tópicos **Pagamentos** e **Order**. Uma URL fixa por ambiente ? ver `docs/integrations/mercadopago-qr-orders.md#webhooks`.
 
 **Nao use** `DB_HOST=127.0.0.1` nem `DB_PORT=5433` no Coolify.
 

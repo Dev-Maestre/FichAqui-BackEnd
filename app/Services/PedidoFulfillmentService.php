@@ -13,7 +13,7 @@ class PedidoFulfillmentService
     ) {}
 
     /**
-     * Gera fichas quando o pagamento est· confirmado. Idempotente.
+     * Gera fichas quando o pagamento est√° confirmado. Idempotente.
      */
     public function fulfillIfPaid(Pedido $pedido): Pedido
     {

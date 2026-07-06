@@ -324,6 +324,54 @@ class MercadoPagoGatewayTest extends TestCase
         $this->assertSame('ORDCARD02', $result->gatewayOrderId);
     }
 
+    public function test_create_online_card_order_sends_debit_card_type(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-access-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders' => Http::response([
+                'id' => 'ORDDEB01',
+                'status' => 'processed',
+                'transactions' => [
+                    'payments' => [
+                        [
+                            'id' => 'PAYDEB01',
+                            'status' => 'processed',
+                            'payment_method' => [
+                                'id' => 'visa',
+                                'type' => 'debit_card',
+                                'installments' => 1,
+                            ],
+                        ],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $gateway = new MercadoPagoGateway;
+
+        $result = $gateway->createOnlineCardOrder(new CardOnlineOrderRequest(
+            idempotencyKey: 'pedido-debit-1',
+            amount: 20.0,
+            externalReference: 'pedido-debit-1',
+            payerEmail: 'test_user_123@testuser.com',
+            token: 'debit-token',
+            paymentMethodId: 'visa',
+            installments: 1,
+            paymentMethodType: 'debit_card',
+        ));
+
+        $this->assertTrue($result->isApproved());
+
+        Http::assertSent(function ($request) {
+            return $request['transactions']['payments'][0]['payment_method']['type'] === 'debit_card'
+                && $request['transactions']['payments'][0]['payment_method']['installments'] === 1;
+        });
+    }
+
     public function test_create_card_payment_legacy_sends_token_to_payments_api(): void
     {
         config([

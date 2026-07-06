@@ -47,6 +47,7 @@ class PedidoCheckoutService
             'cardId' => ['nullable', 'string'],
             'cardToken' => ['nullable', 'string'],
             'paymentMethodId' => ['nullable', 'string'],
+            'paymentMethodType' => ['nullable', 'string', 'in:credit_card,debit_card'],
             'installments' => ['nullable', 'integer', 'min:1'],
             'saveCard' => ['nullable', 'boolean'],
         ])->validate();
@@ -57,8 +58,10 @@ class PedidoCheckoutService
         $lines = $this->resolveLines($evento, $validated['items']);
         $total = $lines->sum(fn (array $line) => $line['unitPrice'] * $line['quantity']);
         $pedidoId = 'pedido-'.Str::lower((string) Str::ulid());
+        $cardPaymentType = $this->resolveCardPaymentType($validated['paymentMethodType'] ?? null);
+        $installments = $this->resolveInstallments((int) ($validated['installments'] ?? 1), $cardPaymentType);
 
-        return DB::transaction(function () use ($user, $evento, $validated, $lines, $total, $pedidoId) {
+        return DB::transaction(function () use ($user, $evento, $validated, $lines, $total, $pedidoId, $cardPaymentType, $installments) {
             $payment = $this->processPayment(
                 $user,
                 $evento,
@@ -66,7 +69,8 @@ class PedidoCheckoutService
                 $validated['cardId'] ?? null,
                 $validated['cardToken'] ?? null,
                 $validated['paymentMethodId'] ?? null,
-                (int) ($validated['installments'] ?? 1),
+                $cardPaymentType,
+                $installments,
                 $total,
                 $pedidoId,
                 $lines,
@@ -185,6 +189,7 @@ class PedidoCheckoutService
         ?string $cardId,
         ?string $cardToken,
         ?string $paymentMethodId,
+        string $paymentMethodType,
         int $installments,
         float $total,
         string $idempotencyKey,
@@ -197,6 +202,7 @@ class PedidoCheckoutService
                 $cardId,
                 $cardToken,
                 $paymentMethodId,
+                $paymentMethodType,
                 $installments,
                 $total,
                 $idempotencyKey,
@@ -252,6 +258,7 @@ class PedidoCheckoutService
         ?string $cardId,
         ?string $cardToken,
         ?string $paymentMethodId,
+        string $paymentMethodType,
         int $installments,
         float $total,
         string $idempotencyKey,
@@ -275,6 +282,7 @@ class PedidoCheckoutService
                     token: $cardToken,
                     paymentMethodId: $paymentMethodId ?? 'visa',
                     installments: $installments,
+                    paymentMethodType: $paymentMethodType,
                     payerName: $user->name,
                     payerCpf: $user->cpf,
                     description: 'Pedido FichAqui - '.$evento->name,
@@ -532,5 +540,25 @@ class PedidoCheckoutService
         $carteira->update(['balance' => (float) $carteira->balance - $total]);
 
         return 'paid';
+    }
+
+    private function resolveCardPaymentType(?string $type): string
+    {
+        return in_array($type, ['credit_card', 'debit_card'], true) ? $type : 'credit_card';
+    }
+
+    private function resolveInstallments(int $installments, string $paymentMethodType): int
+    {
+        if ($paymentMethodType === 'debit_card') {
+            if ($installments !== 1) {
+                throw ValidationException::withMessages([
+                    'installments' => ['Cartao de debito aceita apenas pagamento a vista.'],
+                ]);
+            }
+
+            return 1;
+        }
+
+        return max(1, $installments);
     }
 }
