@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/events/{eventId}/stalls/{stallId}', [StallController::class, 'update']);
     Route::put('/events/{eventId}/stalls/{stallId}/offerings', [OfferingController::class, 'replaceForStall']);
     Route::get('/user/wallet', [WalletController::class, 'show']);
+    Route::post('/user/wallet/top-up', [WalletController::class, 'topUp']);
     Route::get('/user/pedidos', [UserPedidoController::class, 'index']);
     Route::get('/user/fichas', [UserFichaController::class, 'index']);
     Route::get('/events/{eventId}/pedidos', [PedidoController::class, 'index']);

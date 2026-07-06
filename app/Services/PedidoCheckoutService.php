@@ -9,7 +9,6 @@ use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
 use App\Models\CartaoSalvo;
-use App\Models\Carteira;
 use App\Models\Evento;
 use App\Models\Oferta;
 use App\Models\OfertaVariante;
@@ -31,6 +30,7 @@ class PedidoCheckoutService
     public function __construct(
         private readonly FichaGenerationService $fichaGenerationService,
         private readonly PaymentGateway $paymentGateway,
+        private readonly CarteiraLedgerService $carteiraLedgerService,
     ) {}
 
     /**
@@ -208,7 +208,7 @@ class PedidoCheckoutService
                 $idempotencyKey,
                 $lines,
             ),
-            'wallet' => ['paymentStatus' => $this->processWallet($user, $total)],
+            'wallet' => ['paymentStatus' => $this->processWallet($user, $total, $idempotencyKey)],
             'pix' => $this->processPix($user, $evento, $total, $idempotencyKey, $lines),
             default => throw ValidationException::withMessages([
                 'paymentMethod' => ['Metodo de pagamento invalido.'],
@@ -524,20 +524,13 @@ class PedidoCheckoutService
         ]);
     }
 
-    private function processWallet(User $user, float $total): string
+    private function processWallet(User $user, float $total, string $pedidoId): string
     {
-        $carteira = Carteira::query()->firstOrCreate(
-            ['user_id' => $user->id],
-            ['balance' => 0],
+        $this->carteiraLedgerService->debitarCompra(
+            pedidoId: $pedidoId,
+            userId: $user->id,
+            amount: $total,
         );
-
-        if ((float) $carteira->balance < $total) {
-            throw ValidationException::withMessages([
-                'paymentMethod' => ['Saldo insuficiente na carteira.'],
-            ]);
-        }
-
-        $carteira->update(['balance' => (float) $carteira->balance - $total]);
 
         return 'paid';
     }

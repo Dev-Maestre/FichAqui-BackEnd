@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Carteira;
 use App\Models\CartaoSalvo;
 use App\Models\Oferta;
 use App\Models\User;
@@ -106,5 +107,69 @@ class CheckoutTest extends TestCase
             'paymentMethod' => 'credit_card',
             'cardId' => 'card-other',
         ])->assertStatus(422);
+    }
+
+    public function test_checkout_with_wallet_debits_ledger(): void
+    {
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $initialBalance = (float) Carteira::query()->where('user_id', $maria->id)->value('balance');
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $response = $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                [
+                    'offeringId' => $offeringId,
+                    'variantId' => 'carne',
+                    'quantity' => 2,
+                ],
+            ],
+            'paymentMethod' => 'wallet',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('total', 16)
+            ->assertJsonPath('paymentStatus', 'paid')
+            ->assertJsonCount(2, 'fichas');
+
+        $pedidoId = $response->json('id');
+
+        $this->assertEquals($initialBalance - 16, (float) Carteira::query()->where('user_id', $maria->id)->value('balance'));
+
+        $this->assertDatabaseHas('carteira_movimentos', [
+            'user_id' => $maria->id,
+            'direction' => 'debito',
+            'tipo' => 'compra',
+            'amount' => 16,
+            'saldo_apos' => $initialBalance - 16,
+            'origem_tipo' => 'pedido',
+            'origem_id' => $pedidoId,
+            'idempotency_key' => "pedido:{$pedidoId}:debito",
+        ]);
+    }
+
+    public function test_checkout_with_insufficient_wallet_balance_returns_422(): void
+    {
+        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        Carteira::query()->where('user_id', $maria->id)->update(['balance' => 5]);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                [
+                    'offeringId' => $offeringId,
+                    'variantId' => 'carne',
+                    'quantity' => 2,
+                ],
+            ],
+            'paymentMethod' => 'wallet',
+        ])->assertStatus(422);
+
+        $this->assertDatabaseCount('carteira_movimentos', 0);
     }
 }

@@ -29,6 +29,11 @@ class Carteira extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function movimentos(): HasMany
+    {
+        return $this->hasMany(CarteiraMovimento::class, 'user_id', 'user_id');
+    }
+
     public function cartoes(): HasMany
     {
         return $this->hasMany(CartaoSalvo::class, 'user_id', 'user_id');

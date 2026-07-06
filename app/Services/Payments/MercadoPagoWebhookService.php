@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Models\CarteiraRecarga;
 use App\Models\Pedido;
 use App\Services\PaymentSyncService;
 use Illuminate\Support\Facades\Log;
@@ -33,7 +34,7 @@ class MercadoPagoWebhookService
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function handle(array $payload, ?string $queryDataId = null): ?Pedido
+    public function handle(array $payload, ?string $queryDataId = null): Pedido|CarteiraRecarga|null
     {
         $topic = $this->resolveTopic($payload);
         $referenceId = $this->resolveReferenceId($payload, $queryDataId);

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Barraca;
 use App\Models\CartaoSalvo;
 use App\Models\Carteira;
+use App\Models\CarteiraRecarga;
 use App\Models\CatalogoProduto;
 use App\Models\Categoria;
 use App\Models\Evento;
@@ -113,6 +114,62 @@ class FrontendPresenter
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * @return array{balance: float, payment: array<string, mixed>}
+     */
+    public static function walletTopUpResult(Carteira $carteira, CarteiraRecarga $recarga): array
+    {
+        return [
+            'balance' => (float) $carteira->balance,
+            'payment' => self::walletTopUpPayment($recarga),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function walletTopUpPaymentStatus(CarteiraRecarga $recarga): array
+    {
+        return self::walletTopUpPayment($recarga);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function walletTopUpPayment(CarteiraRecarga $recarga): array
+    {
+        $payload = [
+            'paymentId' => $recarga->gateway_payment_id ?? $recarga->gateway_order_id ?? $recarga->id,
+            'gatewayOrderId' => $recarga->gateway_order_id,
+            'status' => self::normalizePaymentStatusForFrontend($recarga->payment_status),
+            'method' => $recarga->payment_method,
+            'topUpId' => $recarga->id,
+            'amount' => (float) $recarga->amount,
+        ];
+
+        if ($recarga->payment_method === 'pix') {
+            $payload['pix'] = [
+                'qrCode' => $recarga->pix_qr_code,
+                'copyPaste' => $recarga->pix_copy_paste,
+                'expiresAt' => $recarga->pix_expires_at?->toIso8601String(),
+            ];
+            $payload['pixQrCode'] = $recarga->pix_qr_code;
+            $payload['pixCopyPaste'] = $recarga->pix_copy_paste;
+            $payload['pixExpiresAt'] = $recarga->pix_expires_at?->toIso8601String();
+        }
+
+        return $payload;
+    }
+
+    private static function normalizePaymentStatusForFrontend(string $status): string
+    {
+        return match ($status) {
+            'paid', 'approved' => 'approved',
+            'failed', 'rejected', 'payment_failed' => 'rejected',
+            default => 'pending',
+        };
     }
 
     public static function savedCard(CartaoSalvo $cartao): array

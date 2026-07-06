@@ -6,11 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\CartaoSalvo;
 use App\Models\Carteira;
 use App\Services\FrontendPresenter;
+use App\Services\WalletTopUpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class WalletController extends Controller
 {
+    public function __construct(
+        private readonly WalletTopUpService $walletTopUpService,
+    ) {}
+
     public function show(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -27,5 +32,15 @@ class WalletController extends Controller
             ->get();
 
         return response()->json(FrontendPresenter::wallet($carteira, $cartoes));
+    }
+
+    public function topUp(Request $request): JsonResponse
+    {
+        $result = $this->walletTopUpService->topUp($request->user(), $request->all());
+
+        return response()->json(
+            FrontendPresenter::walletTopUpResult($result['carteira'], $result['recarga']),
+            201,
+        );
     }
 }
