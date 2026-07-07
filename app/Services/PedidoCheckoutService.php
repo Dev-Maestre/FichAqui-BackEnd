@@ -15,6 +15,7 @@ use App\Models\OfertaVariante;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\User;
+use App\Support\Cpf;
 use App\Support\MercadoPagoErrors;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
@@ -48,6 +49,8 @@ class PedidoCheckoutService
             'cardToken' => ['nullable', 'string'],
             'paymentMethodId' => ['nullable', 'string'],
             'paymentMethodType' => ['nullable', 'string', 'in:credit_card,debit_card'],
+            'cardholderName' => ['nullable', 'string', 'max:120'],
+            'cardholderCpf' => ['nullable', 'string', 'max:14'],
             'installments' => ['nullable', 'integer', 'min:1'],
             'saveCard' => ['nullable', 'boolean'],
         ])->validate();
@@ -74,6 +77,8 @@ class PedidoCheckoutService
                 $total,
                 $pedidoId,
                 $lines,
+                $validated['cardholderName'] ?? null,
+                $validated['cardholderCpf'] ?? null,
             );
 
             $orderStatus = $payment['paymentStatus'] === 'paid' ? 'available' : 'pending_payment';
@@ -194,6 +199,8 @@ class PedidoCheckoutService
         float $total,
         string $idempotencyKey,
         Collection $lines,
+        ?string $cardholderName = null,
+        ?string $cardholderCpf = null,
     ): array {
         return match ($method) {
             'credit_card' => $this->processCreditCard(
@@ -207,6 +214,8 @@ class PedidoCheckoutService
                 $total,
                 $idempotencyKey,
                 $lines,
+                $cardholderName,
+                $cardholderCpf,
             ),
             'wallet' => ['paymentStatus' => $this->processWallet($user, $total, $idempotencyKey)],
             'pix' => $this->processPix($user, $evento, $total, $idempotencyKey, $lines),
@@ -246,6 +255,23 @@ class PedidoCheckoutService
                 'cardToken' => ['Informe cardId (cartao salvo) ou cardToken (Mercado Pago.js).'],
             ]);
         }
+
+        if ($hasCardToken) {
+            $name = trim((string) ($validated['cardholderName'] ?? ''));
+            $cpf = Cpf::digits($validated['cardholderCpf'] ?? null);
+
+            if ($name === '') {
+                throw ValidationException::withMessages([
+                    'cardholderName' => ['Informe o nome do titular do cartao.'],
+                ]);
+            }
+
+            if ($cpf === null || ! Cpf::isValid($cpf)) {
+                throw ValidationException::withMessages([
+                    'cardholderCpf' => ['Informe um CPF valido do titular do cartao.'],
+                ]);
+            }
+        }
     }
 
     /**
@@ -263,6 +289,8 @@ class PedidoCheckoutService
         float $total,
         string $idempotencyKey,
         Collection $lines,
+        ?string $cardholderName = null,
+        ?string $cardholderCpf = null,
     ): array {
         if ($cardToken !== null && $cardToken !== '') {
             if (! $this->paymentGateway->isConfigured()) {
@@ -283,8 +311,8 @@ class PedidoCheckoutService
                     paymentMethodId: $paymentMethodId ?? 'visa',
                     installments: $installments,
                     paymentMethodType: $paymentMethodType,
-                    payerName: $user->name,
-                    payerCpf: $user->cpf,
+                    payerName: $cardholderName,
+                    payerCpf: $cardholderCpf,
                     description: 'Pedido FichAqui - '.$evento->name,
                     items: $this->buildMercadoPagoItems($lines),
                 ));

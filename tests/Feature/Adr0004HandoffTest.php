@@ -464,6 +464,8 @@ class Adr0004HandoffTest extends TestCase
             'paymentMethod' => 'credit_card',
             'cardToken' => 'tok_test_card',
             'paymentMethodId' => 'visa',
+            'cardholderName' => 'APRO',
+            'cardholderCpf' => '12345678909',
         ])
             ->assertCreated()
             ->assertJsonPath('status', 'available')
@@ -475,6 +477,8 @@ class Adr0004HandoffTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'https://api.mercadopago.com/v1/orders'
             && ($request['transactions']['payments'][0]['payment_method']['type'] ?? null) === 'credit_card'
             && ($request['transactions']['payments'][0]['payment_method']['token'] ?? null) === 'tok_test_card'
+            && ($request['payer']['first_name'] ?? null) === 'APRO'
+            && ($request['payer']['identification']['number'] ?? null) === '12345678909'
             && ! isset($request['shipment']));
     }
 
@@ -514,6 +518,8 @@ class Adr0004HandoffTest extends TestCase
             'paymentMethod' => 'credit_card',
             'cardToken' => 'tok_test_pending',
             'paymentMethodId' => 'master',
+            'cardholderName' => 'APRO',
+            'cardholderCpf' => '12345678909',
         ])
             ->assertCreated()
             ->assertJsonPath('status', 'pending_payment')
@@ -580,6 +586,8 @@ class Adr0004HandoffTest extends TestCase
             'paymentMethod' => 'credit_card',
             'cardToken' => 'tok_test_rejected',
             'paymentMethodId' => 'visa',
+            'cardholderName' => 'APRO',
+            'cardholderCpf' => '12345678909',
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['paymentMethod']);
