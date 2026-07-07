@@ -18,6 +18,7 @@ class CarteiraRecarga extends Model
         'user_id',
         'amount',
         'payment_method',
+        'save_card',
         'payment_status',
         'gateway_payment_id',
         'gateway_order_id',
@@ -31,6 +32,7 @@ class CarteiraRecarga extends Model
     {
         return [
             'amount' => 'float',
+            'save_card' => 'boolean',
             'pix_expires_at' => 'datetime',
             'credited_at' => 'datetime',
         ];

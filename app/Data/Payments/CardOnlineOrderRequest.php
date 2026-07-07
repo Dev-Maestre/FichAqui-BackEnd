@@ -18,6 +18,7 @@ readonly class CardOnlineOrderRequest
         public string $paymentMethodType = 'credit_card',
         public ?string $payerName = null,
         public ?string $payerCpf = null,
+        public ?string $mercadoPagoCustomerId = null,
         public string $description = 'Pedido FichAqui',
         public array $items = [],
     ) {}

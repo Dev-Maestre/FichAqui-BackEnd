@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Carteira;
 use App\Models\CarteiraRecarga;
 use App\Models\User;
 use Database\Seeders\CatalogSeeder;
@@ -57,7 +58,7 @@ class WalletTopUpTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_credit_card_top_up_is_not_supported_yet(): void
+    public function test_credit_card_top_up_requires_card_token(): void
     {
         config($this->mercadoPagoTestConfig());
 
@@ -67,7 +68,9 @@ class WalletTopUpTest extends TestCase
         $this->postJson('/api/user/wallet/top-up', [
             'amount' => 50,
             'paymentMethod' => 'credit_card',
-        ])->assertStatus(422);
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['cardToken']);
     }
 
     public function test_pix_pending_top_up_returns_qr_and_keeps_balance(): void
@@ -100,16 +103,19 @@ class WalletTopUpTest extends TestCase
 
         $initialBalance = (float) Carteira::query()->where('user_id', $maria->id)->value('balance');
 
-        $this->postJson('/api/user/wallet/top-up', [
+        $response = $this->postJson('/api/user/wallet/top-up', [
             'amount' => 25,
             'paymentMethod' => 'pix',
-        ])
+        ]);
+
+        $response
             ->assertCreated()
-            ->assertJsonPath('balance', $initialBalance)
             ->assertJsonPath('payment.status', 'pending')
             ->assertJsonPath('payment.method', 'pix')
             ->assertJsonPath('payment.paymentId', 'PAY-WALLET-001')
             ->assertJsonPath('payment.pix.copyPaste', '000201PIXWALLET');
+
+        $this->assertEquals($initialBalance, (float) $response->json('balance'));
 
         $this->assertDatabaseHas('carteira_recargas', [
             'user_id' => $maria->id,

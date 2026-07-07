@@ -6,6 +6,7 @@ use App\Contracts\PaymentGateway;
 use App\Data\Payments\CardOnlineOrderRequest;
 use App\Data\Payments\CardPaymentRequest;
 use App\Data\Payments\GatewayPaymentResult;
+use App\Data\Payments\GatewaySavedCard;
 use App\Data\Payments\OnlineOrderRequest;
 use App\Data\Payments\PixPaymentRequest;
 use App\Data\Payments\QrOrderRequest;
@@ -80,7 +81,12 @@ class MercadoPagoGateway implements PaymentGateway
             'description' => Str::limit($request->description, 150, ''),
             'total_amount' => $amount,
             'processing_mode' => 'automatic',
-            'payer' => $this->buildPayer($request->payerEmail, $request->payerName, $request->payerCpf),
+            'payer' => $this->buildPayer(
+                $request->payerEmail,
+                $request->payerName,
+                $request->payerCpf,
+                $request->mercadoPagoCustomerId,
+            ),
             'transactions' => [
                 'payments' => [
                     [
@@ -244,6 +250,89 @@ class MercadoPagoGateway implements PaymentGateway
         $response->throw();
 
         return $this->mapPaymentResponse($response->json());
+    }
+
+    public function ensureCustomer(string $email, ?string $name = null, ?string $cpf = null): string
+    {
+        $this->ensureConfigured();
+
+        $search = $this->client()->get('/v1/customers/search', [
+            'email' => $email,
+        ]);
+
+        $search->throw();
+
+        $results = $search->json('results');
+
+        if (is_array($results) && isset($results[0]['id'])) {
+            return (string) $results[0]['id'];
+        }
+
+        $response = $this->client()->post('/v1/customers', array_filter([
+            'email' => $email,
+            'first_name' => $this->firstName($name),
+            'last_name' => $this->lastName($name),
+            'identification' => $this->identificationPayload($cpf),
+        ], fn ($value) => $value !== null && $value !== ''));
+
+        $response->throw();
+
+        return (string) $response->json('id');
+    }
+
+    public function addCustomerCard(string $customerId, string $cardToken): GatewaySavedCard
+    {
+        $this->ensureConfigured();
+
+        $response = $this->client()->post(
+            '/v1/customers/'.urlencode($customerId).'/cards',
+            ['token' => $cardToken],
+        );
+
+        if (! $response->successful()) {
+            throw ValidationException::withMessages([
+                'cardToken' => [MercadoPagoErrors::messageFromPayload($response->json())],
+            ]);
+        }
+
+        return $this->mapSavedCardResponse($response->json());
+    }
+
+    /**
+     * @return list<GatewaySavedCard>
+     */
+    public function listCustomerCards(string $customerId): array
+    {
+        $this->ensureConfigured();
+
+        $response = $this->client()->get('/v1/customers/'.urlencode($customerId).'/cards');
+        $response->throw();
+
+        $cards = $response->json();
+
+        if (! is_array($cards)) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (array $card) => $this->mapSavedCardResponse($card),
+            array_filter($cards, 'is_array'),
+        ));
+    }
+
+    public function deleteCustomerCard(string $customerId, string $cardId): void
+    {
+        $this->ensureConfigured();
+
+        $response = $this->client()->delete(
+            '/v1/customers/'.urlencode($customerId).'/cards/'.urlencode($cardId),
+        );
+
+        if ($response->status() === 404) {
+            return;
+        }
+
+        $response->throw();
     }
 
     public function getOrder(string $gatewayOrderId): GatewayPaymentResult
@@ -467,8 +556,12 @@ class MercadoPagoGateway implements PaymentGateway
     /**
      * @return array<string, mixed>
      */
-    private function buildPayer(string $payerEmail, ?string $payerName, ?string $payerCpf): array
-    {
+    private function buildPayer(
+        string $payerEmail,
+        ?string $payerName,
+        ?string $payerCpf,
+        ?string $customerId = null,
+    ): array {
         $firstName = Str::before(trim($payerName ?? 'Consumidor'), ' ');
         $lastName = trim(Str::after(trim($payerName ?? ''), ' '));
 
@@ -477,6 +570,10 @@ class MercadoPagoGateway implements PaymentGateway
             'first_name' => $firstName !== '' ? $firstName : 'Consumidor',
             'entity_type' => 'individual',
         ];
+
+        if ($customerId !== null && $customerId !== '') {
+            $payer['id'] = $customerId;
+        }
 
         if ($lastName !== '' && $lastName !== $firstName) {
             $payer['last_name'] = $lastName;
@@ -492,6 +589,66 @@ class MercadoPagoGateway implements PaymentGateway
         }
 
         return $payer;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $payload
+     */
+    private function mapSavedCardResponse(?array $payload): GatewaySavedCard
+    {
+        if ($payload === null) {
+            throw new RuntimeException('Resposta vazia do Mercado Pago (customer card).');
+        }
+
+        $lastFour = (string) (data_get($payload, 'last_four_digits') ?? '');
+
+        if ($lastFour === '') {
+            $firstSix = (string) data_get($payload, 'first_six_digits', '000000');
+            $lastFour = substr($firstSix, -4);
+        }
+
+        return new GatewaySavedCard(
+            id: (string) ($payload['id'] ?? ''),
+            brand: (string) data_get($payload, 'payment_method.id', 'elo'),
+            lastFour: str_pad(substr($lastFour, -4), 4, '0', STR_PAD_LEFT),
+            holderName: (string) data_get($payload, 'cardholder.name', 'Titular'),
+        );
+    }
+
+    private function firstName(?string $name): string
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        return Str::limit(Str::before($name, ' '), 60, '');
+    }
+
+    private function lastName(?string $name): string
+    {
+        $name = trim((string) $name);
+        $lastName = trim(Str::after($name, ' '));
+
+        return $lastName !== '' && $lastName !== $name ? Str::limit($lastName, 60, '') : '';
+    }
+
+    /**
+     * @return array{type: string, number: string}|null
+     */
+    private function identificationPayload(?string $payerCpf): ?array
+    {
+        $cpf = Cpf::digits($payerCpf);
+
+        if ($cpf === null || ! Cpf::isValid($cpf)) {
+            return null;
+        }
+
+        return [
+            'type' => 'CPF',
+            'number' => $cpf,
+        ];
     }
 
     /**

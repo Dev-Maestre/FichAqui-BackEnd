@@ -32,6 +32,7 @@ class PedidoCheckoutService
         private readonly FichaGenerationService $fichaGenerationService,
         private readonly PaymentGateway $paymentGateway,
         private readonly CarteiraLedgerService $carteiraLedgerService,
+        private readonly SavedCardService $savedCardService,
     ) {}
 
     /**
@@ -63,8 +64,10 @@ class PedidoCheckoutService
         $pedidoId = 'pedido-'.Str::lower((string) Str::ulid());
         $cardPaymentType = $this->resolveCardPaymentType($validated['paymentMethodType'] ?? null);
         $installments = $this->resolveInstallments((int) ($validated['installments'] ?? 1), $cardPaymentType);
+        $saveCard = (bool) ($validated['saveCard'] ?? false);
+        $usedSavedCard = ! empty($validated['cardId']);
 
-        return DB::transaction(function () use ($user, $evento, $validated, $lines, $total, $pedidoId, $cardPaymentType, $installments) {
+        return DB::transaction(function () use ($user, $evento, $validated, $lines, $total, $pedidoId, $cardPaymentType, $installments, $saveCard, $usedSavedCard) {
             $payment = $this->processPayment(
                 $user,
                 $evento,
@@ -79,6 +82,7 @@ class PedidoCheckoutService
                 $lines,
                 $validated['cardholderName'] ?? null,
                 $validated['cardholderCpf'] ?? null,
+                $saveCard,
             );
 
             $orderStatus = $payment['paymentStatus'] === 'paid' ? 'available' : 'pending_payment';
@@ -96,6 +100,7 @@ class PedidoCheckoutService
                 'qr_code' => 'QR-PEDIDO-'.Str::upper(Str::random(8)),
                 'payment_method' => $validated['paymentMethod'],
                 'card_id' => $validated['cardId'] ?? null,
+                'save_card' => $saveCard && ! $usedSavedCard,
                 'payment_status' => $payment['paymentStatus'],
                 'gateway_payment_id' => $payment['gatewayPaymentId'] ?? null,
                 'gateway_order_id' => $payment['gatewayOrderId'] ?? null,
@@ -129,6 +134,10 @@ class PedidoCheckoutService
 
             if ($payment['paymentStatus'] === 'paid') {
                 $this->fichaGenerationService->generateForPedido($pedido, $fichaLines);
+
+                if ($saveCard && ! $usedSavedCard) {
+                    $this->savedCardService->maybeSaveAfterPayment($user, true, false);
+                }
             }
 
             return $pedido->fresh(['itens', 'fichas']);
@@ -201,6 +210,7 @@ class PedidoCheckoutService
         Collection $lines,
         ?string $cardholderName = null,
         ?string $cardholderCpf = null,
+        bool $saveCard = false,
     ): array {
         return match ($method) {
             'credit_card' => $this->processCreditCard(
@@ -216,6 +226,7 @@ class PedidoCheckoutService
                 $lines,
                 $cardholderName,
                 $cardholderCpf,
+                $saveCard,
             ),
             'wallet' => ['paymentStatus' => $this->processWallet($user, $total, $idempotencyKey)],
             'pix' => $this->processPix($user, $evento, $total, $idempotencyKey, $lines),
@@ -259,18 +270,25 @@ class PedidoCheckoutService
         if ($hasCardToken) {
             $name = trim((string) ($validated['cardholderName'] ?? ''));
             $cpf = Cpf::digits($validated['cardholderCpf'] ?? null);
+            $hasSavedCard = ! empty($validated['cardId']);
 
-            if ($name === '') {
+            if (! $hasSavedCard && $name === '') {
                 throw ValidationException::withMessages([
                     'cardholderName' => ['Informe o nome do titular do cartao.'],
                 ]);
             }
 
-            if ($cpf === null || ! Cpf::isValid($cpf)) {
+            if (! $hasSavedCard && ($cpf === null || ! Cpf::isValid($cpf))) {
                 throw ValidationException::withMessages([
                     'cardholderCpf' => ['Informe um CPF valido do titular do cartao.'],
                 ]);
             }
+        }
+
+        if ($hasCardId && ! $hasCardToken && $this->paymentGateway->isConfigured()) {
+            throw ValidationException::withMessages([
+                'cardToken' => ['Informe cardToken gerado a partir do cartao salvo.'],
+            ]);
         }
     }
 
@@ -291,6 +309,7 @@ class PedidoCheckoutService
         Collection $lines,
         ?string $cardholderName = null,
         ?string $cardholderCpf = null,
+        bool $saveCard = false,
     ): array {
         if ($cardToken !== null && $cardToken !== '') {
             if (! $this->paymentGateway->isConfigured()) {
@@ -299,7 +318,30 @@ class PedidoCheckoutService
                 ]);
             }
 
+            $resolvedHolderName = trim((string) ($cardholderName ?? ''));
+            $resolvedCpf = $cardholderCpf;
+
+            if ($cardId !== null && $cardId !== '') {
+                $cartao = $this->savedCardService->findOwnedCard($user, $cardId);
+
+                if ($resolvedHolderName === '') {
+                    $resolvedHolderName = $cartao->holder_name;
+                }
+
+                if ($resolvedCpf === null || trim((string) $resolvedCpf) === '') {
+                    $resolvedCpf = $user->cpf;
+                }
+            }
+
             $this->assertSandboxPayerEmail($user);
+
+            $mercadoPagoCustomerId = null;
+
+            if ($saveCard || ($cardId !== null && $cardId !== '')) {
+                $mercadoPagoCustomerId = $this->savedCardService->ensureMercadoPagoCustomer($user);
+            } elseif (is_string($user->mercadopago_customer_id) && $user->mercadopago_customer_id !== '') {
+                $mercadoPagoCustomerId = $user->mercadopago_customer_id;
+            }
 
             try {
                 $result = $this->paymentGateway->createOnlineCardOrder(new CardOnlineOrderRequest(
@@ -311,8 +353,9 @@ class PedidoCheckoutService
                     paymentMethodId: $paymentMethodId ?? 'visa',
                     installments: $installments,
                     paymentMethodType: $paymentMethodType,
-                    payerName: $cardholderName,
-                    payerCpf: $cardholderCpf,
+                    payerName: $resolvedHolderName !== '' ? $resolvedHolderName : $user->name,
+                    payerCpf: $resolvedCpf ?? $user->cpf,
+                    mercadoPagoCustomerId: $mercadoPagoCustomerId,
                     description: 'Pedido FichAqui - '.$evento->name,
                     items: $this->buildMercadoPagoItems($lines),
                 ));
@@ -329,7 +372,7 @@ class PedidoCheckoutService
 
         if ($this->paymentGateway->isConfigured()) {
             throw ValidationException::withMessages([
-                'cardId' => ['Pagamento com cartao salvo ainda nao disponivel. Use cardToken.'],
+                'cardToken' => ['Informe cardToken (Mercado Pago.js).'],
             ]);
         }
 

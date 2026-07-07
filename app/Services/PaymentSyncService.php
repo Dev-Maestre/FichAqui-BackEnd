@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\PaymentGateway;
 use App\Models\CarteiraRecarga;
 use App\Models\Pedido;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +15,7 @@ class PaymentSyncService
         private readonly PaymentGateway $paymentGateway,
         private readonly PedidoFulfillmentService $fulfillmentService,
         private readonly CarteiraLedgerService $carteiraLedgerService,
+        private readonly SavedCardService $savedCardService,
     ) {}
 
     public function syncByGatewayPaymentId(string $gatewayReferenceId): Pedido|CarteiraRecarga|null
@@ -63,7 +65,19 @@ class PaymentSyncService
         if ($result->isApproved()) {
             $pedido->update(['payment_status' => 'paid']);
 
-            return $this->fulfillmentService->fulfillIfPaid($pedido);
+            $fulfilled = $this->fulfillmentService->fulfillIfPaid($pedido);
+
+            if ($fulfilled->save_card) {
+                $user = User::query()->findOrFail($fulfilled->user_id);
+                $this->savedCardService->maybeSaveAfterPayment(
+                    $user,
+                    true,
+                    $fulfilled->card_id !== null && $fulfilled->card_id !== '',
+                );
+                $fulfilled->update(['save_card' => false]);
+            }
+
+            return $fulfilled->fresh(['itens', 'fichas']);
         }
 
         if ($result->isPending()) {
@@ -115,7 +129,15 @@ class PaymentSyncService
 
                 $recarga->update(['payment_status' => 'paid']);
 
-                return $this->carteiraLedgerService->creditarRecarga($recarga);
+                $credited = $this->carteiraLedgerService->creditarRecarga($recarga);
+
+                if ($credited->save_card) {
+                    $user = User::query()->findOrFail($credited->user_id);
+                    $this->savedCardService->maybeSaveAfterPayment($user, true, false);
+                    $credited->update(['save_card' => false]);
+                }
+
+                return $credited;
             });
         }
 

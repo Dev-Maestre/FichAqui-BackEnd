@@ -25,6 +25,7 @@ class Pedido extends Model
         'qr_code',
         'payment_method',
         'card_id',
+        'save_card',
         'payment_status',
         'gateway_payment_id',
         'gateway_order_id',
@@ -37,6 +38,7 @@ class Pedido extends Model
     {
         return [
             'total' => 'float',
+            'save_card' => 'boolean',
             'pix_expires_at' => 'datetime',
         ];
     }

@@ -174,13 +174,19 @@ class FrontendPresenter
 
     public static function savedCard(CartaoSalvo $cartao): array
     {
-        return [
+        $payload = [
             'id' => $cartao->id,
             'brand' => $cartao->brand,
             'lastFour' => $cartao->last_four,
             'holderName' => $cartao->holder_name,
             'isDefault' => $cartao->is_default,
         ];
+
+        if (is_string($cartao->gateway_token) && $cartao->gateway_token !== '') {
+            $payload['mercadoPagoCardId'] = $cartao->gateway_token;
+        }
+
+        return $payload;
     }
 
     public static function barraca(\App\Models\Barraca $barraca): array

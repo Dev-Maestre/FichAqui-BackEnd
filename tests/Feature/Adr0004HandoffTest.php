@@ -548,7 +548,7 @@ class Adr0004HandoffTest extends TestCase
             'cardId' => 'card-1',
         ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['cardId']);
+            ->assertJsonValidationErrors(['cardToken']);
 
         Http::assertNothingSent();
     }

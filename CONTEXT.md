@@ -48,6 +48,10 @@ _Avoid_: Ticket, voucher, comprovante
 Saldo pré-pago do Usuário na plataforma, usado como método de pagamento no checkout. Débito bem-sucedido no checkout equivale a pagamento confirmado na hora.
 _Avoid_: Wallet, conta, créditos
 
+A**Cartão salvo**:
+Cartão tokenizado do Usuário, reutilizável em checkout e recarga sem redigitar número completo. O backend persiste metadados de exibição (bandeira, últimos 4, titular) e a referência do gateway (`gateway_token` = `card_id` do Customer no Mercado Pago). Na API autenticada do próprio Usuário, a referência do gateway pode ser exposta como `mercadoPagoCardId` para re-tokenização no browser — não é dado de cartão nem segredo de pagamento. **Nunca** persistir ou expor: PAN, CVV, validade completa, `cardToken` one-shot, `ACCESS_TOKEN` do MP.
+_Avoid_: Cartão cadastrado, payment method, wallet card
+
 **Pagamento confirmado**:
 Momento em que o valor foi liquidado ? débito de Carteira, aprovação imediata do gateway ou confirmação assíncrona (ex.: PIX). É o gatilho para emissão das Fichas.
 _Avoid_: Approved, paid, settled
