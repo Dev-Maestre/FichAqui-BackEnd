@@ -31,11 +31,11 @@ class PedidoCheckoutService
     public const PAYMENT_METHODS = ['credit_card', 'pix', 'wallet'];
 
     public function __construct(
-        private readonly FichaGenerationService $fichaGenerationService,
         private readonly PaymentGateway $paymentGateway,
         private readonly CarteiraLedgerService $carteiraLedgerService,
         private readonly SavedCardService $savedCardService,
         private readonly EstoqueService $estoqueService,
+        private readonly PedidoFulfillmentService $fulfillmentService,
     ) {}
 
     /**
@@ -112,8 +112,6 @@ class PedidoCheckoutService
                 'pix_expires_at' => $payment['pixExpiresAt'] ?? null,
             ]);
 
-            $fichaLines = [];
-
             foreach ($lines as $line) {
                 PedidoItem::query()->create([
                     'pedido_id' => $pedido->id,
@@ -128,16 +126,10 @@ class PedidoCheckoutService
                         'unitPrice' => $line['unitPrice'],
                     ],
                 ]);
-
-                $fichaLines[] = [
-                    'ofertaVariante' => $line['variante'],
-                    'quantity' => $line['quantity'],
-                ];
             }
 
             if ($payment['paymentStatus'] === 'paid') {
-                $this->estoqueService->consumeForLines($fichaLines);
-                $this->fichaGenerationService->generateForPedido($pedido, $fichaLines);
+                $pedido = $this->fulfillmentService->fulfillIfPaid($pedido);
 
                 if ($saveCard && ! $usedSavedCard) {
                     $this->savedCardService->maybeSaveAfterPayment($user, true, false);

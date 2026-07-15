@@ -10,6 +10,7 @@ use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\User;
 use App\Services\CarteiraLedgerService;
+use App\Services\EstoqueService;
 use App\Support\ItemNameFormatter;
 use Illuminate\Database\Seeder;
 use RuntimeException;
@@ -199,7 +200,7 @@ class StagingDemoSeeder extends Seeder
 
         $ledger->debitarCompra($pedidoId, $maria->id, $total);
 
-        $this->upsertFichas($pedidoId, $line['variante'], $fichas);
+        $this->seedFichasWithStock($pedidoId, $line, $fichas);
     }
 
     /**
@@ -228,7 +229,7 @@ class StagingDemoSeeder extends Seeder
 
         $this->upsertPedidoItem('pedido-demo-card', $line);
 
-        $this->upsertFichas('pedido-demo-card', $line['variante'], [
+        $this->seedFichasWithStock('pedido-demo-card', $line, [
             ['id' => 'ficha-demo-card-1', 'qr' => 'QR-DEMO-PASTEL-05', 'status' => 'available'],
         ]);
     }
@@ -328,6 +329,26 @@ class StagingDemoSeeder extends Seeder
                 ],
             ],
         );
+    }
+
+    /**
+     * @param  array{variante: OfertaVariante, quantity: int, unitPrice: float, itemName: string, stallName: string, category: string, image: string}  $line
+     * @param  list<array{id: string, qr: string, status: string}>  $fichas
+     */
+    private function seedFichasWithStock(string $pedidoId, array $line, array $fichas): void
+    {
+        $alreadySeeded = Ficha::query()->where('pedido_id', $pedidoId)->exists();
+
+        if (! $alreadySeeded) {
+            app(EstoqueService::class)->consumeForLines([
+                [
+                    'ofertaVariante' => $line['variante'],
+                    'quantity' => $line['quantity'],
+                ],
+            ]);
+        }
+
+        $this->upsertFichas($pedidoId, $line['variante'], $fichas);
     }
 
     /**

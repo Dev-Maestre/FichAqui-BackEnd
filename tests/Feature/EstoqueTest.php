@@ -10,6 +10,7 @@ use Database\Seeders\FichaquiSeeder;
 use Database\Seeders\OfferingSeeder;
 use Database\Seeders\WalletSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -67,13 +68,87 @@ class EstoqueTest extends TestCase
                     'quantity' => 3,
                 ],
             ],
-            'paymentMethod' => 'credit_card',
-            'cardId' => 'card-1',
-        ])->assertCreated();
+            'paymentMethod' => 'wallet',
+        ])->assertCreated()
+            ->assertJsonCount(3, 'fichas');
 
         $this->assertDatabaseHas('oferta_variantes', [
             'id' => $varianteId,
             'stock' => 7,
+        ]);
+    }
+
+    public function test_pix_approval_decrements_variant_stock_and_generates_fichas(): void
+    {
+        config([
+            'mercadopago.access_token' => 'TEST-token',
+            'mercadopago.api_base_url' => 'https://api.mercadopago.com',
+            'mercadopago.sandbox' => false,
+        ]);
+
+        Http::fake([
+            'api.mercadopago.com/v1/orders*' => Http::sequence()
+                ->push([
+                    'id' => 'ORD-STOCK-1',
+                    'status' => 'action_required',
+                    'type' => 'online',
+                    'transactions' => [
+                        'payments' => [
+                            [
+                                'id' => 'PAY-STOCK-1',
+                                'status' => 'action_required',
+                                'payment_method' => [
+                                    'id' => 'pix',
+                                    'qr_code' => '000201PIXSTOCK',
+                                ],
+                            ],
+                        ],
+                    ],
+                ], 201)
+                ->push([
+                    'id' => 'ORD-STOCK-1',
+                    'status' => 'processed',
+                    'type' => 'online',
+                    'transactions' => [
+                        'payments' => [
+                            [
+                                'id' => 'PAY-STOCK-1',
+                                'status' => 'approved',
+                                'status_detail' => 'accredited',
+                            ],
+                        ],
+                    ],
+                ], 200),
+        ]);
+
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
+        Sanctum::actingAs($maria);
+
+        $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
+        $varianteId = OfertaVariante::buildId($offeringId, 'carne');
+        OfertaVariante::query()->whereKey($varianteId)->update(['stock' => 10]);
+
+        $this->postJson('/api/events/1/pedidos', [
+            'items' => [
+                ['offeringId' => $offeringId, 'variantId' => 'carne', 'quantity' => 2],
+            ],
+            'paymentMethod' => 'pix',
+        ])->assertCreated()
+            ->assertJsonCount(0, 'fichas');
+
+        $this->assertDatabaseHas('oferta_variantes', [
+            'id' => $varianteId,
+            'stock' => 10,
+        ]);
+
+        $this->getJson('/api/payments/PAY-STOCK-1/status')
+            ->assertOk()
+            ->assertJsonPath('status', 'paid')
+            ->assertJsonCount(2, 'fichas');
+
+        $this->assertDatabaseHas('oferta_variantes', [
+            'id' => $varianteId,
+            'stock' => 8,
         ]);
     }
 
