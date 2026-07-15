@@ -402,6 +402,7 @@ class Adr0004HandoffTest extends TestCase
         $this->getJson('/api/auth/me')
             ->assertOk()
             ->assertJsonPath('stallId', 'stall-1')
+            ->assertJsonPath('stallName', 'Barraca do Pastel')
             ->assertJsonPath('eventId', '1');
     }
 
