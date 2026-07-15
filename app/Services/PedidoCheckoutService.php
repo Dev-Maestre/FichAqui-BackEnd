@@ -20,6 +20,7 @@ use App\Support\MercadoPagoErrors;
 use App\Support\MercadoPagoSandbox;
 use Illuminate\Http\Client\RequestException;
 use App\Support\ItemNameFormatter;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
