@@ -10,6 +10,7 @@ class PedidoFulfillmentService
 {
     public function __construct(
         private readonly FichaGenerationService $fichaGenerationService,
+        private readonly EstoqueService $estoqueService,
     ) {}
 
     /**
@@ -49,6 +50,7 @@ class PedidoFulfillmentService
             }
 
             if ($lines !== []) {
+                $this->estoqueService->consumeForLines($lines);
                 $this->fichaGenerationService->generateForPedido($pedido, $lines);
             }
 

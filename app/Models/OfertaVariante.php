@@ -20,6 +20,7 @@ class OfertaVariante extends Model
         'variant_template_id',
         'price',
         'available',
+        'stock',
         'badge',
     ];
 
@@ -28,6 +29,7 @@ class OfertaVariante extends Model
         return [
             'price' => 'float',
             'available' => 'boolean',
+            'stock' => 'integer',
         ];
     }
 

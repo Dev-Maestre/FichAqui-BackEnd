@@ -33,12 +33,21 @@ Agrupamento visual do catálogo global (Comidas, Doces, Bebidas).
 _Avoid_: Category, tag, grupo
 
 **Template de variante**:
-Variação pré-definida de um Produto de catálogo (Carne, Queijo, Unidade). O preço e a disponibilidade são definidos na Oferta.
+Variação pré-definida de um Produto de catálogo (Carne, Queijo, Unidade). O preço, a disponibilidade e o estoque são definidos na variante da Oferta. Variante só pode ser ativada pelo organizador com preço maior que zero e estoque maior que zero.
 _Avoid_: Variant, SKU filho
 
 **Oferta**:
-Precificação e disponibilização de um Produto de catálogo em uma Barraca durante um Evento. Referencia o catálogo global; não duplica nome ou imagem do produto.
+Precificação e disponibilização de um Produto de catálogo em uma Barraca durante um Evento. Referencia o catálogo global; não duplica nome ou imagem do produto. O estoque é por variante ativa, não por Barraca. Produto novo adicionado à barraca entra com todas as variantes inativas até o organizador definir preço e estoque.
 _Avoid_: Offering, menu item, SKU por evento
+
+**Estoque**:
+Quantidade disponível para venda de uma variante ativa numa Oferta. Controlado item a item (por variante), não como saldo único da Barraca. Toda variante ativa exige quantidade informada; não há modo ilimitado. Diminui somente após pagamento confirmado do Pedido; pagamento pendente não consome estoque. Pedido com quantidade acima do estoque disponível é rejeitado por completo no checkout. No carrinho, a quantidade selecionável não pode exceder o estoque disponível da variante.
+_Avoid_: Stock da barraca, inventário geral, reserva no checkout
+
+**Esgotado**:
+Estado de uma variante com estoque zerado. Permanece visível no cardápio com indicação clara, mas não pode ser comprada. É distinto de variante desativada pelo organizador.
+Ao repor estoque acima de zero, a variante volta a ser comprável automaticamente se ainda estiver ativa pelo organizador. O consumidor não vê contagem de unidades restantes — apenas a indicação Esgotado quando o estoque zera.
+_Avoid_: Indisponível, fora de estoque (genérico)
 
 **Ficha**:
 Unidade individual de retirada criada somente após confirmação do pagamento do Pedido. `quantity: N` gera N fichas com QR único; consumo marca uma ficha por vez.

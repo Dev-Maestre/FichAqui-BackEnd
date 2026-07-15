@@ -23,7 +23,6 @@ class StallWriteTest extends TestCase
             'category' => 'doces',
             'responsible' => 'Ana Costa',
             'color' => '#ec4899',
-            'stock' => 80,
         ])
             ->assertCreated()
             ->assertJsonPath('name', 'Barraca de Doces')
@@ -47,7 +46,6 @@ class StallWriteTest extends TestCase
             'responsible' => 'Joao',
             'color' => '#000000',
             'status' => 'open',
-            'stock' => 10,
         ]);
 
         Sanctum::actingAs($this->organizerUser());
