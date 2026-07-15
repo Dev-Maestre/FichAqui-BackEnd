@@ -11,7 +11,10 @@ class WalletSeeder extends Seeder
 {
     public function run(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->first();
+        $maria = User::query()
+            ->where('external_id', 'user-maria')
+            ->orWhere('email', 'maria@testuser.com')
+            ->first();
         if (! $maria) {
             return;
         }

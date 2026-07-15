@@ -12,20 +12,7 @@ class FichaquiSeeder extends Seeder
     public function run(): void
     {
         foreach ($this->usuarios() as $usuario) {
-            User::query()->updateOrCreate(
-                ['email' => $usuario['email']],
-                [
-                    'external_id' => $usuario['external_id'],
-                    'name' => $usuario['name'],
-                    'password' => $usuario['password'],
-                    'roles' => $usuario['roles'],
-                    'organizer_id' => $usuario['organizer_id'] ?? null,
-                    'phone' => $usuario['phone'] ?? null,
-                    'cpf' => $usuario['cpf'] ?? null,
-                    'birth_date' => $usuario['birth_date'] ?? null,
-                    'stall_id' => $usuario['stall_id'] ?? null,
-                ]
-            );
+            $this->upsertUsuario($usuario);
         }
 
         foreach ($this->eventos() as $evento) {
@@ -35,6 +22,38 @@ class FichaquiSeeder extends Seeder
         foreach ($this->barracas() as $barraca) {
             Barraca::query()->updateOrCreate(['id' => $barraca['id']], $barraca);
         }
+    }
+
+    /**
+     * @param  array{external_id: string, email: string, password: string, name: string, roles: list<string>, organizer_id?: string, phone?: string, cpf?: string, birth_date?: string, stall_id?: string}  $usuario
+     */
+    private function upsertUsuario(array $usuario): void
+    {
+        $user = User::query()
+            ->where('external_id', $usuario['external_id'])
+            ->orWhere('email', $usuario['email'])
+            ->first();
+
+        $attributes = [
+            'external_id' => $usuario['external_id'],
+            'email' => $usuario['email'],
+            'name' => $usuario['name'],
+            'password' => $usuario['password'],
+            'roles' => $usuario['roles'],
+            'organizer_id' => $usuario['organizer_id'] ?? null,
+            'phone' => $usuario['phone'] ?? null,
+            'cpf' => $usuario['cpf'] ?? null,
+            'birth_date' => $usuario['birth_date'] ?? null,
+            'stall_id' => $usuario['stall_id'] ?? null,
+        ];
+
+        if ($user !== null) {
+            $user->update($attributes);
+
+            return;
+        }
+
+        User::query()->create($attributes);
     }
 
     private function usuarios(): array
