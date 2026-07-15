@@ -104,7 +104,7 @@ class MercadoPagoGatewayTest extends TestCase
             idempotencyKey: 'pedido-online-402',
             amount: 10.0,
             externalReference: 'pedido-online-402',
-            payerEmail: 'maria@testuser.com',
+            payerEmail: 'test_user_5207637493757128652@testuser.com',
             shipmentAddress: [
                 'zip_code' => '80010000',
                 'street_name' => 'Rua Teste',
@@ -393,7 +393,7 @@ class MercadoPagoGatewayTest extends TestCase
             idempotencyKey: 'pedido-test-1',
             amount: 16.0,
             description: 'Pedido FichAqui',
-            payerEmail: 'maria@testuser.com',
+            payerEmail: 'test_user_5207637493757128652@testuser.com',
             token: 'card-token-from-mp-js',
             installments: 1,
             paymentMethodId: 'visa',

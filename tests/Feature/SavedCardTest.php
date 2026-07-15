@@ -32,7 +32,7 @@ class SavedCardTest extends TestCase
     {
         config(['mercadopago.access_token' => null]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->postJson('/api/user/wallet/cards', [
@@ -61,7 +61,7 @@ class SavedCardTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->postJson('/api/user/wallet/cards', [
@@ -104,7 +104,7 @@ class SavedCardTest extends TestCase
             'api.mercadopago.com/v1/customers/CUST-001/cards/MP-CARD-DUP' => Http::response(null, 200),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->postJson('/api/user/wallet/cards', [
@@ -122,7 +122,7 @@ class SavedCardTest extends TestCase
             'mercadopago.sandbox' => true,
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
 
         for ($i = 3; $i <= SavedCardService::MAX_SAVED_CARDS; $i++) {
             CartaoSalvo::query()->create([
@@ -154,7 +154,7 @@ class SavedCardTest extends TestCase
             'api.mercadopago.com/v1/customers/CUST-001/cards/MP-CARD-001' => Http::response(null, 200),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         $maria->update(['mercadopago_customer_id' => 'CUST-001']);
 
         $card = CartaoSalvo::query()->create([
@@ -204,7 +204,7 @@ class SavedCardTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         $maria->update(['mercadopago_customer_id' => 'CUST-001']);
 
         CartaoSalvo::query()->where('id', 'card-1')->update([
@@ -265,7 +265,7 @@ class SavedCardTest extends TestCase
             ]),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         CartaoSalvo::query()->where('user_id', $maria->id)->delete();
 
         Sanctum::actingAs($maria);

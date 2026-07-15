@@ -49,7 +49,7 @@ class WalletTopUpTest extends TestCase
     {
         config(['mercadopago.access_token' => null]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->postJson('/api/user/wallet/top-up', [
@@ -62,7 +62,7 @@ class WalletTopUpTest extends TestCase
     {
         config($this->mercadoPagoTestConfig());
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->postJson('/api/user/wallet/top-up', [
@@ -98,7 +98,7 @@ class WalletTopUpTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $initialBalance = (float) Carteira::query()->where('user_id', $maria->id)->value('balance');
@@ -167,7 +167,7 @@ class WalletTopUpTest extends TestCase
                 ], 200),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $initialBalance = (float) Carteira::query()->where('user_id', $maria->id)->value('balance');
@@ -231,7 +231,7 @@ class WalletTopUpTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->postJson('/api/user/wallet/top-up', [

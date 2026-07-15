@@ -24,7 +24,7 @@ class WalletTest extends TestCase
 
     public function test_wallet_returns_balance_and_saved_cards(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $this->getJson('/api/user/wallet')

@@ -25,7 +25,7 @@ class FichaquiSeederTest extends TestCase
         $this->assertDatabaseCount('users', 3);
         $this->assertDatabaseHas('users', [
             'external_id' => 'user-maria',
-            'email' => 'maria@testuser.com',
+            'email' => 'test_user_5207637493757128652@testuser.com',
             'name' => 'Maria Silva',
             'mercadopago_customer_id' => null,
         ]);

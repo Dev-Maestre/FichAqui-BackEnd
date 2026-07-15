@@ -27,7 +27,7 @@ class AdminPedidosTest extends TestCase
 
     public function test_organizer_can_list_event_pedidos_with_admin_dto(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -65,7 +65,7 @@ class AdminPedidosTest extends TestCase
 
     public function test_consumer_cannot_list_event_pedidos(): void
     {
-        Sanctum::actingAs(User::query()->where('email', 'maria@testuser.com')->firstOrFail());
+        Sanctum::actingAs(User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail());
 
         $this->getJson('/api/events/1/pedidos')->assertForbidden();
     }

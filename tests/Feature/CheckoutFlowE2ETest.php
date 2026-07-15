@@ -34,7 +34,7 @@ class CheckoutFlowE2ETest extends TestCase
 
         $offeringId = collect($offerings->json())->firstWhere('productId', 'pastel')['id'];
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $checkout = $this->postJson('/api/events/1/pedidos', [

@@ -56,7 +56,7 @@ class Adr0004HandoffTest extends TestCase
     {
         config(['mercadopago.access_token' => null]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -97,7 +97,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -144,7 +144,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -209,7 +209,7 @@ class Adr0004HandoffTest extends TestCase
                 ], 200),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -256,7 +256,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -292,7 +292,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -315,7 +315,7 @@ class Adr0004HandoffTest extends TestCase
             'mercadopago.sandbox' => true,
         ]));
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         $maria->update(['email' => 'maria@email.com']);
         Sanctum::actingAs($maria->fresh());
 
@@ -376,7 +376,7 @@ class Adr0004HandoffTest extends TestCase
                 ], 200),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -452,7 +452,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -506,7 +506,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -535,7 +535,7 @@ class Adr0004HandoffTest extends TestCase
     {
         config($this->mercadoPagoTestConfig());
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -574,7 +574,7 @@ class Adr0004HandoffTest extends TestCase
             ], 201),
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
