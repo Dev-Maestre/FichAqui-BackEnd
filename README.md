@@ -8,6 +8,8 @@ API Laravel do FichAqui. Integração Mercado Pago (PIX, cartão): variáveis em
 
 **Webhooks:** URL fixa por ambiente em `MP_WEBHOOK_URL`; em dev local use túnel (ngrok/cloudflared) ? ver [`docs/integrations/mercadopago-qr-orders.md#webhooks`](docs/integrations/mercadopago-qr-orders.md#webhooks).
 
+**Staging demo:** após `db:seed`, rode `php artisan db:seed --class=StagingDemoSeeder` para popular pedidos/fichas de teste — ver [`docs/staging-demo-seeder.md`](docs/staging-demo-seeder.md).
+
 <p align="center">
 <a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
