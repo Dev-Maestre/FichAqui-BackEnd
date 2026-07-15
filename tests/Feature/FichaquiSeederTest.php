@@ -17,6 +17,7 @@ class FichaquiSeederTest extends TestCase
             'external_id' => 'user-maria',
             'email' => 'outro-email@example.com',
             'name' => 'Outro Nome',
+            'mercadopago_customer_id' => 'CUST-STALE',
         ]);
 
         $this->seed(FichaquiSeeder::class);
@@ -26,6 +27,7 @@ class FichaquiSeederTest extends TestCase
             'external_id' => 'user-maria',
             'email' => 'maria@testuser.com',
             'name' => 'Maria Silva',
+            'mercadopago_customer_id' => null,
         ]);
     }
 

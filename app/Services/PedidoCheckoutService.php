@@ -17,6 +17,7 @@ use App\Models\PedidoItem;
 use App\Models\User;
 use App\Support\Cpf;
 use App\Support\MercadoPagoErrors;
+use App\Support\MercadoPagoSandbox;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -333,13 +334,17 @@ class PedidoCheckoutService
                 }
             }
 
-            $this->assertSandboxPayerEmail($user);
+            MercadoPagoSandbox::assertPayerEmail($user);
 
             $mercadoPagoCustomerId = null;
 
             if ($saveCard || ($cardId !== null && $cardId !== '')) {
                 $mercadoPagoCustomerId = $this->savedCardService->ensureMercadoPagoCustomer($user);
-            } elseif (is_string($user->mercadopago_customer_id) && $user->mercadopago_customer_id !== '') {
+            } elseif (
+                MercadoPagoSandbox::shouldAttachCachedCustomerId()
+                && is_string($user->mercadopago_customer_id)
+                && $user->mercadopago_customer_id !== ''
+            ) {
                 $mercadoPagoCustomerId = $user->mercadopago_customer_id;
             }
 
@@ -405,7 +410,7 @@ class PedidoCheckoutService
             ]);
         }
 
-        $this->assertSandboxPayerEmail($user);
+        MercadoPagoSandbox::assertPayerEmail($user);
 
         $driver = $this->resolvePixDriver();
 
@@ -524,24 +529,6 @@ class PedidoCheckoutService
     private function formatMercadoPagoError(RequestException $exception): string
     {
         return MercadoPagoErrors::messageFromPayload($exception->response?->json());
-    }
-
-    private function assertSandboxPayerEmail(User $user): void
-    {
-        if (! config('mercadopago.sandbox')) {
-            return;
-        }
-
-        if (str_ends_with(strtolower($user->email), '@testuser.com')) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'paymentMethod' => [
-                'No sandbox do Mercado Pago, use um e-mail de comprador de teste (@testuser.com). '
-                .'Crie em Credenciais de teste > Contas de teste no painel MP.',
-            ],
-        ]);
     }
 
     private function resolvePixDriver(): string

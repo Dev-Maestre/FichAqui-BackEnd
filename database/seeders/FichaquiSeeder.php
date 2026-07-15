@@ -48,6 +48,10 @@ class FichaquiSeeder extends Seeder
         ];
 
         if ($user !== null) {
+            if (strcasecmp($user->email, $usuario['email']) !== 0) {
+                $attributes['mercadopago_customer_id'] = null;
+            }
+
             $user->update($attributes);
 
             return;

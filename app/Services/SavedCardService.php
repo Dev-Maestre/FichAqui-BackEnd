@@ -7,6 +7,7 @@ use App\Data\Payments\GatewaySavedCard;
 use App\Models\CartaoSalvo;
 use App\Models\User;
 use Illuminate\Support\Str;
+use App\Support\MercadoPagoSandbox;
 use Illuminate\Validation\ValidationException;
 
 class SavedCardService
@@ -19,6 +20,8 @@ class SavedCardService
 
     public function ensureMercadoPagoCustomer(User $user): string
     {
+        MercadoPagoSandbox::assertPayerEmail($user);
+
         if (is_string($user->mercadopago_customer_id) && $user->mercadopago_customer_id !== '') {
             return $user->mercadopago_customer_id;
         }
