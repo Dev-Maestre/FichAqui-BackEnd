@@ -14,6 +14,7 @@ use App\Models\Oferta;
 use App\Models\Pedido;
 use App\Models\User;
 use App\Support\AssetUrl;
+use App\Support\ItemNameFormatter;
 use App\Support\PrimaryRoleResolver;
 
 use Illuminate\Support\Collection;
@@ -236,7 +237,7 @@ class FrontendPresenter
         return [
             'id' => $ficha->id,
             'orderId' => $ficha->pedido_id,
-            'itemName' => $ficha->item_name,
+            'itemName' => ItemNameFormatter::normalizeLegacy($ficha->item_name),
             'itemImage' => self::asset($ficha->item_image),
             'stallId' => $ficha->barraca_id,
             'stallName' => $ficha->barraca_name,
@@ -367,7 +368,7 @@ class FrontendPresenter
 
             if (isset($snapshot['name'], $snapshot['stallName'])) {
                 return [
-                    'name' => $snapshot['name'],
+                    'name' => ItemNameFormatter::normalizeLegacy((string) $snapshot['name']),
                     'quantity' => $item->quantity,
                     'stallName' => $snapshot['stallName'],
                 ];
@@ -378,7 +379,7 @@ class FrontendPresenter
             $stallName = is_array($legacyItem) ? ($legacyItem['stallId'] ?? '') : '';
 
             return [
-                'name' => $name,
+                'name' => ItemNameFormatter::normalizeLegacy($name),
                 'quantity' => $item->quantity,
                 'stallName' => $stallName,
             ];

@@ -7,6 +7,7 @@ use App\Models\CatalogoProduto;
 use App\Models\Ficha;
 use App\Models\OfertaVariante;
 use App\Models\Pedido;
+use App\Support\ItemNameFormatter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -22,13 +23,22 @@ class FichaGenerationService
 
         foreach ($lines as $line) {
             $variante = $line['ofertaVariante'];
-            $variante->loadMissing(['oferta.barraca', 'oferta.catalogoProduto', 'variantTemplate']);
+            $variante->loadMissing(['oferta.barraca', 'oferta.catalogoProduto.variantTemplates', 'oferta.variantes', 'variantTemplate']);
 
             $oferta = $variante->oferta;
             $produto = $oferta->catalogoProduto;
             $barraca = $oferta->barraca;
             $templateLabel = $variante->variantTemplate->label;
-            $itemName = $produto->name.' ? '.$templateLabel;
+            $availableVariantCount = $oferta->variantes
+                ->filter(fn (OfertaVariante $entry) => $entry->available)
+                ->count();
+            $templateCount = $produto->variantTemplates->count();
+            $itemName = ItemNameFormatter::format(
+                $produto->name,
+                $templateLabel,
+                $availableVariantCount,
+                $templateCount,
+            );
 
             for ($i = 0; $i < $line['quantity']; $i++) {
                 $fichas[] = Ficha::query()->create([

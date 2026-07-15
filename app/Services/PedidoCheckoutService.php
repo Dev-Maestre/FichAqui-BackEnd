@@ -19,7 +19,7 @@ use App\Support\Cpf;
 use App\Support\MercadoPagoErrors;
 use App\Support\MercadoPagoSandbox;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Collection;
+use App\Support\ItemNameFormatter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -153,7 +153,7 @@ class PedidoCheckoutService
     {
         return collect($items)->map(function (array $item, int $index) use ($evento) {
             $oferta = Oferta::query()
-                ->with(['variantes.variantTemplate', 'barraca', 'catalogoProduto'])
+                ->with(['variantes.variantTemplate', 'barraca', 'catalogoProduto.variantTemplates'])
                 ->find($item['offeringId']);
 
             if (! $oferta || $oferta->evento_id !== $evento->id) {
@@ -180,7 +180,14 @@ class PedidoCheckoutService
 
             $produto = $oferta->catalogoProduto;
             $templateLabel = $variante->variantTemplate->label;
-            $itemName = $produto->name.' ? '.$templateLabel;
+            $availableVariantCount = $oferta->variantes->filter(fn (OfertaVariante $v) => $v->available)->count();
+            $templateCount = $produto->variantTemplates->count();
+            $itemName = ItemNameFormatter::format(
+                $produto->name,
+                $templateLabel,
+                $availableVariantCount,
+                $templateCount,
+            );
 
             return [
                 'variante' => $variante,

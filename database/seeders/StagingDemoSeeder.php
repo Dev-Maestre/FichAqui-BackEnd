@@ -10,6 +10,7 @@ use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\User;
 use App\Services\CarteiraLedgerService;
+use App\Support\ItemNameFormatter;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
@@ -123,15 +124,23 @@ class StagingDemoSeeder extends Seeder
      */
     private function buildLine(OfertaVariante $variante, int $quantity = 2): array
     {
+        $variante->loadMissing(['oferta.barraca', 'oferta.catalogoProduto.variantTemplates', 'oferta.variantes', 'variantTemplate']);
         $oferta = $variante->oferta;
         $produto = $oferta->catalogoProduto;
         $templateLabel = $variante->variantTemplate->label;
+        $availableVariantCount = $oferta->variantes->filter(fn (OfertaVariante $entry) => $entry->available)->count();
+        $templateCount = $produto->variantTemplates->count();
 
         return [
             'variante' => $variante,
             'quantity' => $quantity,
             'unitPrice' => (float) $variante->price,
-            'itemName' => $produto->name.' ? '.$templateLabel,
+            'itemName' => ItemNameFormatter::format(
+                $produto->name,
+                $templateLabel,
+                $availableVariantCount,
+                $templateCount,
+            ),
             'stallName' => $oferta->barraca->name,
             'category' => $produto->categoria_id,
             'image' => $produto->image,
@@ -326,11 +335,19 @@ class StagingDemoSeeder extends Seeder
      */
     private function upsertFichas(string $pedidoId, OfertaVariante $variante, array $fichas): void
     {
-        $variante->loadMissing(['oferta.barraca', 'oferta.catalogoProduto', 'variantTemplate']);
+        $variante->loadMissing(['oferta.barraca', 'oferta.catalogoProduto.variantTemplates', 'oferta.variantes', 'variantTemplate']);
 
         $produto = $variante->oferta->catalogoProduto;
         $barraca = $variante->oferta->barraca;
-        $itemName = $produto->name.' ? '.$variante->variantTemplate->label;
+        $oferta = $variante->oferta;
+        $availableVariantCount = $oferta->variantes->filter(fn (OfertaVariante $entry) => $entry->available)->count();
+        $templateCount = $produto->variantTemplates->count();
+        $itemName = ItemNameFormatter::format(
+            $produto->name,
+            $variante->variantTemplate->label,
+            $availableVariantCount,
+            $templateCount,
+        );
 
         foreach ($fichas as $ficha) {
             Ficha::query()->updateOrCreate(
