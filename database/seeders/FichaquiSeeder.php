@@ -163,11 +163,11 @@ class FichaquiSeeder extends Seeder
     private function barracas(): array
     {
         return [
-            ['id' => 'stall-1', 'evento_id' => '1', 'name' => 'Barraca do Pastel', 'category' => 'comidas', 'responsible' => 'Maria Silva', 'color' => '#ef4444', 'status' => 'open', 'stock' => 150],
-            ['id' => 'stall-2', 'evento_id' => '1', 'name' => 'Barraca do Milho', 'category' => 'comidas', 'responsible' => 'Joao Santos', 'color' => '#f59e0b', 'status' => 'open', 'stock' => 200],
-            ['id' => 'stall-5', 'evento_id' => '1', 'name' => 'Pescaria', 'category' => 'jogos', 'responsible' => 'Carlos Oliveira', 'color' => '#22c55e', 'status' => 'open', 'stock' => 50],
-            ['id' => 'stall-n1', 'evento_id' => '2', 'name' => 'Doces Natalinos', 'category' => 'doces', 'responsible' => 'Helena Dias', 'color' => '#16a34a', 'status' => 'open', 'stock' => 120],
-            ['id' => 'stall-est-1', 'evento_id' => 'estabelecimento-paroquia', 'name' => 'Cantina Principal', 'category' => 'comidas', 'responsible' => 'Raul Souza', 'color' => '#16a34a', 'status' => 'open', 'stock' => 100],
+            ['id' => 'stall-1', 'evento_id' => '1', 'name' => 'Barraca do Pastel', 'category' => 'comidas', 'responsible' => 'Maria Silva', 'color' => '#ef4444', 'status' => 'open'],
+            ['id' => 'stall-2', 'evento_id' => '1', 'name' => 'Barraca do Milho', 'category' => 'comidas', 'responsible' => 'Joao Santos', 'color' => '#f59e0b', 'status' => 'open'],
+            ['id' => 'stall-5', 'evento_id' => '1', 'name' => 'Pescaria', 'category' => 'jogos', 'responsible' => 'Carlos Oliveira', 'color' => '#22c55e', 'status' => 'open'],
+            ['id' => 'stall-n1', 'evento_id' => '2', 'name' => 'Doces Natalinos', 'category' => 'doces', 'responsible' => 'Helena Dias', 'color' => '#16a34a', 'status' => 'open'],
+            ['id' => 'stall-est-1', 'evento_id' => 'estabelecimento-paroquia', 'name' => 'Cantina Principal', 'category' => 'comidas', 'responsible' => 'Raul Souza', 'color' => '#16a34a', 'status' => 'open'],
         ];
     }
 }

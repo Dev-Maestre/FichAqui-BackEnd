@@ -265,7 +265,6 @@ class EventWriteTest extends TestCase
             'responsible' => 'Resp',
             'color' => '#d97706',
             'status' => 'open',
-            'stock' => 10,
         ]);
 
         return $evento;

@@ -76,7 +76,6 @@ class EventoWriteService
                 'responsible' => 'Organizador',
                 'color' => $primaryColor,
                 'status' => 'open',
-                'stock' => 100,
             ]);
 
             $offerings = $this->offeringWriteService->replaceForStall($evento, $barraca, [
@@ -84,7 +83,7 @@ class EventoWriteService
                     'productId' => 'item-boas-vindas',
                     'available' => true,
                     'variants' => [
-                        ['templateId' => 'unidade', 'price' => 5, 'available' => true],
+                        ['templateId' => 'unidade', 'price' => 5, 'available' => true, 'stock' => 100],
                     ],
                 ],
             ]);

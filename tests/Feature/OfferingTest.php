@@ -35,7 +35,7 @@ class OfferingTest extends TestCase
                 'stallId',
                 'productId',
                 'available',
-                'variants' => [['templateId', 'price', 'available']],
+                'variants' => [['templateId', 'price', 'available', 'stock']],
             ]])
             ->assertJsonFragment([
                 'productId' => 'pastel',
@@ -53,8 +53,8 @@ class OfferingTest extends TestCase
                 'productId' => 'pastel',
                 'available' => true,
                 'variants' => [
-                    ['templateId' => 'carne', 'price' => 9.5, 'available' => true],
-                    ['templateId' => 'queijo', 'price' => 8.5, 'available' => false],
+                    ['templateId' => 'carne', 'price' => 9.5, 'available' => true, 'stock' => 80],
+                    ['templateId' => 'queijo', 'price' => 8.5, 'available' => false, 'stock' => 0],
                 ],
             ],
         ];
@@ -83,7 +83,7 @@ class OfferingTest extends TestCase
             [
                 'productId' => 'produto-inexistente',
                 'variants' => [
-                    ['templateId' => 'carne', 'price' => 5, 'available' => true],
+                    ['templateId' => 'carne', 'price' => 5, 'available' => true, 'stock' => 10],
                 ],
             ],
         ])->assertStatus(422);

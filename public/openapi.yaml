@@ -901,8 +901,6 @@ components:
         status:
           type: string
           enum: [open, closed]
-        stock:
-          type: integer
 
     CreateStallRequest:
       type: object
@@ -920,9 +918,6 @@ components:
           type: string
           enum: [open, closed]
           default: open
-        stock:
-          type: integer
-          default: 0
 
     UpdateStallRequest:
       type: object
@@ -938,8 +933,6 @@ components:
         status:
           type: string
           enum: [open, closed]
-        stock:
-          type: integer
 
     Offering:
       type: object
@@ -972,6 +965,9 @@ components:
           format: float
         available:
           type: boolean
+        stock:
+          type: integer
+          minimum: 0
         badge:
           type: string
           nullable: true

@@ -22,15 +22,7 @@ class Barraca extends Model
         'responsible',
         'color',
         'status',
-        'stock',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'stock' => 'integer',
-        ];
-    }
 
     public function evento(): BelongsTo
     {

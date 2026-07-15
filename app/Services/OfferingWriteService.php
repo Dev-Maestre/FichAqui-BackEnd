@@ -47,7 +47,7 @@ class OfferingWriteService
 
     /**
      * @param  array<string, mixed>  $offering
-     * @return array{productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, badge: ?string}>}
+     * @return array{productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, stock: int, badge: ?string}>}
      */
     private function validateOfferingPayload(array $offering): array
     {
@@ -57,6 +57,7 @@ class OfferingWriteService
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.templateId' => ['required', 'string'],
             'variants.*.price' => ['required', 'numeric', 'min:0'],
+            'variants.*.stock' => ['required', 'integer', 'min:0'],
             'variants.*.available' => ['sometimes', 'boolean'],
             'variants.*.badge' => ['sometimes', 'nullable', 'string', 'max:64'],
         ])->validate();
@@ -80,6 +81,17 @@ class OfferingWriteService
                     ],
                 ]);
             }
+
+            $available = $variant['available'] ?? true;
+            $price = (float) $variant['price'];
+
+            if ($available && $price <= 0) {
+                throw ValidationException::withMessages([
+                    "variants.{$index}.available" => [
+                        'Informe preco maior que zero antes de ativar a variante.',
+                    ],
+                ]);
+            }
         }
 
         return [
@@ -89,6 +101,7 @@ class OfferingWriteService
                 fn (array $variant) => [
                     'templateId' => $variant['templateId'],
                     'price' => (float) $variant['price'],
+                    'stock' => (int) $variant['stock'],
                     'available' => $variant['available'] ?? true,
                     'badge' => $variant['badge'] ?? null,
                 ],
@@ -98,7 +111,7 @@ class OfferingWriteService
     }
 
     /**
-     * @param  array{productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, badge: ?string}>}  $offeringData
+     * @param  array{productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, stock: int, badge: ?string}>}  $offeringData
      */
     private function createOffering(Evento $evento, Barraca $barraca, array $offeringData): Oferta
     {
@@ -124,6 +137,7 @@ class OfferingWriteService
                 'variant_template_id' => $template->id,
                 'price' => $variantData['price'],
                 'available' => $variantData['available'],
+                'stock' => $variantData['stock'],
                 'badge' => $variantData['badge'],
             ]);
         }

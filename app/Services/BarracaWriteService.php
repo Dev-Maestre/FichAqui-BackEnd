@@ -27,7 +27,6 @@ class BarracaWriteService
             'responsible' => $validated['responsible'],
             'color' => $validated['color'],
             'status' => $validated['status'] ?? 'open',
-            'stock' => $validated['stock'] ?? 0,
         ]);
     }
 
@@ -52,7 +51,6 @@ class BarracaWriteService
             'responsible' => 'responsible',
             'color' => 'color',
             'status' => 'status',
-            'stock' => 'stock',
         ] as $from => $to) {
             if (array_key_exists($from, $validated)) {
                 $attrs[$to] = $validated[$from];
@@ -74,7 +72,6 @@ class BarracaWriteService
             'responsible' => ['required', 'string', 'max:255'],
             'color' => ['required', 'string', 'max:32'],
             'status' => ['sometimes', 'string', 'in:'.implode(',', self::STATUSES)],
-            'stock' => ['sometimes', 'integer', 'min:0'],
         ];
     }
 
@@ -87,7 +84,6 @@ class BarracaWriteService
             'responsible' => ['sometimes', 'string', 'max:255'],
             'color' => ['sometimes', 'string', 'max:32'],
             'status' => ['sometimes', 'string', 'in:'.implode(',', self::STATUSES)],
-            'stock' => ['sometimes', 'integer', 'min:0'],
         ];
     }
 }

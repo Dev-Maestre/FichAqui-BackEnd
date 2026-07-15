@@ -17,7 +17,7 @@ class OfferingSeeder extends Seeder
     }
 
     /**
-     * @param  array{eventoId: string, barracaId: string, productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, badge?: ?string}>}  $data
+     * @param  array{eventoId: string, barracaId: string, productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, stock: int, badge?: ?string}>}  $data
      */
     private function seedOffering(array $data): void
     {
@@ -50,6 +50,7 @@ class OfferingSeeder extends Seeder
                     'variant_template_id' => $template->id,
                     'price' => $variant['price'],
                     'available' => $variant['available'],
+                    'stock' => $variant['stock'],
                     'badge' => $variant['badge'] ?? null,
                 ]
             );
@@ -57,7 +58,7 @@ class OfferingSeeder extends Seeder
     }
 
     /**
-     * @return list<array{eventoId: string, barracaId: string, productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, badge?: ?string}>}>
+     * @return list<array{eventoId: string, barracaId: string, productId: string, available: bool, variants: list<array{templateId: string, price: float, available: bool, stock: int, badge?: ?string}>}>
      */
     private function offerings(): array
     {
@@ -68,8 +69,8 @@ class OfferingSeeder extends Seeder
                 'productId' => 'pastel',
                 'available' => true,
                 'variants' => [
-                    ['templateId' => 'carne', 'price' => 8.0, 'available' => true, 'badge' => 'Mais vendido'],
-                    ['templateId' => 'queijo', 'price' => 7.0, 'available' => true],
+                    ['templateId' => 'carne', 'price' => 8.0, 'available' => true, 'stock' => 150, 'badge' => 'Mais vendido'],
+                    ['templateId' => 'queijo', 'price' => 7.0, 'available' => true, 'stock' => 120],
                 ],
             ],
             [
@@ -78,7 +79,7 @@ class OfferingSeeder extends Seeder
                 'productId' => 'milho-verde',
                 'available' => true,
                 'variants' => [
-                    ['templateId' => 'unidade', 'price' => 6.0, 'available' => true],
+                    ['templateId' => 'unidade', 'price' => 6.0, 'available' => true, 'stock' => 200],
                 ],
             ],
             [
@@ -87,7 +88,7 @@ class OfferingSeeder extends Seeder
                 'productId' => 'pescaria',
                 'available' => true,
                 'variants' => [
-                    ['templateId' => 'jogada', 'price' => 5.0, 'available' => true],
+                    ['templateId' => 'jogada', 'price' => 5.0, 'available' => true, 'stock' => 50],
                 ],
             ],
             [
@@ -96,7 +97,7 @@ class OfferingSeeder extends Seeder
                 'productId' => 'panetone',
                 'available' => true,
                 'variants' => [
-                    ['templateId' => 'fatia', 'price' => 8.0, 'available' => true],
+                    ['templateId' => 'fatia', 'price' => 8.0, 'available' => true, 'stock' => 120],
                 ],
             ],
             [
@@ -105,7 +106,7 @@ class OfferingSeeder extends Seeder
                 'productId' => 'item-boas-vindas',
                 'available' => true,
                 'variants' => [
-                    ['templateId' => 'unidade', 'price' => 5.0, 'available' => true],
+                    ['templateId' => 'unidade', 'price' => 5.0, 'available' => true, 'stock' => 100],
                 ],
             ],
         ];

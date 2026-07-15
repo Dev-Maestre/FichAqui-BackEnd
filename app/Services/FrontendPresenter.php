@@ -203,7 +203,6 @@ class FrontendPresenter
             'responsible' => $barraca->responsible,
             'color' => $barraca->color,
             'status' => $barraca->status,
-            'stock' => $barraca->stock,
         ];
     }
 
@@ -216,6 +215,7 @@ class FrontendPresenter
                 'templateId' => $variante->variantTemplate->slug,
                 'price' => (float) $variante->price,
                 'available' => $variante->available,
+                'stock' => (int) $variante->stock,
             ];
 
             if ($variante->badge !== null) {

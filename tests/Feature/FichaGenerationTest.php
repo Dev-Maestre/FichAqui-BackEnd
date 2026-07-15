@@ -45,7 +45,6 @@ class FichaGenerationTest extends TestCase
             'responsible' => 'Maria',
             'color' => '#ef4444',
             'status' => 'open',
-            'stock' => 50,
         ]);
 
         CatalogoProduto::query()->findOrFail('pastel');
@@ -69,6 +68,7 @@ class FichaGenerationTest extends TestCase
             'variant_template_id' => $template->id,
             'price' => 8,
             'available' => true,
+            'stock' => 10,
         ]);
 
         $pedido = Pedido::query()->create([

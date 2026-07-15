@@ -35,6 +35,7 @@ class PedidoCheckoutService
         private readonly PaymentGateway $paymentGateway,
         private readonly CarteiraLedgerService $carteiraLedgerService,
         private readonly SavedCardService $savedCardService,
+        private readonly EstoqueService $estoqueService,
     ) {}
 
     /**
@@ -135,6 +136,7 @@ class PedidoCheckoutService
             }
 
             if ($payment['paymentStatus'] === 'paid') {
+                $this->estoqueService->consumeForLines($fichaLines);
                 $this->fichaGenerationService->generateForPedido($pedido, $fichaLines);
 
                 if ($saveCard && ! $usedSavedCard) {
@@ -178,6 +180,8 @@ class PedidoCheckoutService
                     "items.{$index}.variantId" => ['Variante indisponivel.'],
                 ]);
             }
+
+            $this->estoqueService->assertSufficient($variante, (int) $item['quantity'], $index);
 
             $produto = $oferta->catalogoProduto;
             $templateLabel = $variante->variantTemplate->label;
