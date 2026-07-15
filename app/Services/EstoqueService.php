@@ -21,14 +21,14 @@ class EstoqueService
     }
 
     /**
-     * @param  list<array{variante: OfertaVariante, quantity: int}>  $lines
+     * @param  list<array{ofertaVariante: OfertaVariante, quantity: int}>  $lines
      */
     public function consumeForLines(array $lines): void
     {
         foreach ($lines as $line) {
             $variante = OfertaVariante::query()
                 ->lockForUpdate()
-                ->findOrFail($line['variante']->id);
+                ->findOrFail($line['ofertaVariante']->id);
 
             if ($line['quantity'] > $variante->stock) {
                 throw ValidationException::withMessages([

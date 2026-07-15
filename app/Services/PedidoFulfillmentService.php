@@ -21,43 +21,62 @@ class PedidoFulfillmentService
         return DB::transaction(function () use ($pedido) {
             $pedido = Pedido::query()
                 ->lockForUpdate()
-                ->with(['itens', 'fichas'])
+                ->with([
+                    'itens.ofertaVariante.oferta.barraca',
+                    'itens.ofertaVariante.oferta.catalogoProduto.variantTemplates',
+                    'itens.ofertaVariante.oferta.variantes',
+                    'itens.ofertaVariante.variantTemplate',
+                    'fichas',
+                ])
                 ->findOrFail($pedido->id);
-
-            if ($pedido->fichas->isNotEmpty()) {
-                return $pedido;
-            }
 
             if (! $pedido->isPaymentConfirmed()) {
                 return $pedido;
             }
 
-            $lines = [];
-
-            foreach ($pedido->itens as $item) {
-                $variante = OfertaVariante::query()
-                    ->with(['oferta.barraca', 'oferta.catalogoProduto', 'variantTemplate'])
-                    ->find($item->oferta_variante_id);
-
-                if (! $variante) {
-                    continue;
+            if ($pedido->fichas->isNotEmpty()) {
+                if ($pedido->status !== 'available' && $pedido->status !== 'delivered') {
+                    $pedido->update(['status' => 'available']);
                 }
 
-                $lines[] = [
-                    'ofertaVariante' => $variante,
-                    'quantity' => $item->quantity,
-                ];
+                return $pedido->fresh(['itens', 'fichas']);
             }
 
-            if ($lines !== []) {
-                $this->estoqueService->consumeForLines($lines);
-                $this->fichaGenerationService->generateForPedido($pedido, $lines);
+            $lines = $this->resolveFulfillmentLines($pedido);
+
+            if ($lines === []) {
+                return $pedido;
             }
 
+            $this->estoqueService->consumeForLines($lines);
+            $this->fichaGenerationService->generateForPedido($pedido, $lines);
             $pedido->update(['status' => 'available']);
 
             return $pedido->fresh(['itens', 'fichas']);
         });
+    }
+
+    /**
+     * @return list<array{ofertaVariante: OfertaVariante, quantity: int}>
+     */
+    private function resolveFulfillmentLines(Pedido $pedido): array
+    {
+        $lines = [];
+
+        foreach ($pedido->itens as $item) {
+            $variante = $item->ofertaVariante;
+
+            if (! $variante) {
+                continue;
+            }
+
+            $lines[] = [
+                'ofertaVariante' => $variante,
+                'quantity' => $item->quantity,
+            ];
+        }
+
+        return $lines;
     }
 
     public function markPaymentFailed(Pedido $pedido): Pedido

@@ -63,9 +63,15 @@ class PaymentSyncService
         }
 
         if ($result->isApproved()) {
-            $pedido->update(['payment_status' => 'paid']);
+            $fulfilled = DB::transaction(function () use ($pedido) {
+                $pedido = Pedido::query()->lockForUpdate()->findOrFail($pedido->id);
 
-            $fulfilled = $this->fulfillmentService->fulfillIfPaid($pedido);
+                if ($pedido->payment_status !== 'paid') {
+                    $pedido->update(['payment_status' => 'paid']);
+                }
+
+                return $this->fulfillmentService->fulfillIfPaid($pedido);
+            });
 
             if ($fulfilled->save_card) {
                 $user = User::query()->findOrFail($fulfilled->user_id);
