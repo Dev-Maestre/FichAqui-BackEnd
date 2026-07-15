@@ -22,4 +22,12 @@ class RelatorioController extends Controller
 
         return response()->json($this->relatorioService->forEvento($evento));
     }
+
+    public function resumo(Request $request, string $eventId): JsonResponse
+    {
+        $evento = Evento::query()->findOrFail($eventId);
+        OrganizerAuthorization::ensureOwns($request->user(), $evento);
+
+        return response()->json($this->relatorioService->resumoForEvento($evento));
+    }
 }

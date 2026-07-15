@@ -2,25 +2,61 @@
 
 namespace App\Services;
 
+use App\Models\Barraca;
 use App\Models\Evento;
+use App\Models\Ficha;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Support\AssetUrl;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 
 class RelatorioService
 {
+    private const TIMEZONE = 'America/Sao_Paulo';
+
     /**
      * @return array<string, mixed>
      */
     public function forEvento(Evento $evento): array
     {
-        $pedidos = Pedido::query()
-            ->with('itens')
-            ->where('evento_id', $evento->id)
-            ->whereIn('payment_status', ['paid', 'approved'])
-            ->whereNotIn('status', ['payment_failed'])
+        $pedidos = $this->confirmedPedidosQuery($evento)->get();
+
+        return $this->buildReport($evento, $pedidos, includeFichaProgress: false);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resumoForEvento(Evento $evento): array
+    {
+        [$start, $end] = $this->todayRange();
+
+        $pedidos = $this->confirmedPedidosQuery($evento)
+            ->whereBetween('created_at', [$start, $end])
             ->get();
 
+        $report = $this->buildReport($evento, $pedidos, includeFichaProgress: true);
+
+        return [
+            'orderCount' => $report['orderCount'],
+            'totalRevenue' => $report['totalRevenue'],
+            'consumerCount' => $this->distinctConsumers($pedidos),
+            'pendingOrderCount' => $this->pendingPedidosQuery($evento)
+                ->whereBetween('created_at', [$start, $end])
+                ->count(),
+            'salesByStall' => $report['salesByStall'],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Pedido>  $pedidos
+     * @return array<string, mixed>
+     */
+    private function buildReport(Evento $evento, Collection $pedidos, bool $includeFichaProgress): array
+    {
         $orderCount = $pedidos->count();
         $totalRevenue = $pedidos->sum(fn (Pedido $p) => (float) $p->total);
         $averageTicket = $orderCount > 0 ? round($totalRevenue / $orderCount, 2) : 0.0;
@@ -32,7 +68,50 @@ class RelatorioService
             'salesByHour' => $this->salesByHour($pedidos),
             'salesByCategory' => $this->salesByCategory($pedidos),
             'topProducts' => $this->topProducts($pedidos),
+            'salesByStall' => $this->salesByStall($evento, $pedidos, $includeFichaProgress),
         ];
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function todayRange(): array
+    {
+        $start = Carbon::now(self::TIMEZONE)->startOfDay()->utc();
+        $end = Carbon::now(self::TIMEZONE)->endOfDay()->utc();
+
+        return [$start, $end];
+    }
+
+    /**
+     * @return Builder<Pedido>
+     */
+    private function confirmedPedidosQuery(Evento $evento): Builder
+    {
+        return Pedido::query()
+            ->with(['itens.ofertaVariante.oferta'])
+            ->where('evento_id', $evento->id)
+            ->whereIn('payment_status', ['paid', 'approved'])
+            ->whereNotIn('status', ['payment_failed']);
+    }
+
+    /**
+     * @return Builder<Pedido>
+     */
+    private function pendingPedidosQuery(Evento $evento): Builder
+    {
+        return Pedido::query()
+            ->where('evento_id', $evento->id)
+            ->where('payment_status', 'pending')
+            ->whereNotIn('status', ['payment_failed']);
+    }
+
+    /**
+     * @param  Collection<int, Pedido>  $pedidos
+     */
+    private function distinctConsumers(Collection $pedidos): int
+    {
+        return $pedidos->pluck('user_id')->filter()->unique()->count();
     }
 
     /**
@@ -44,7 +123,7 @@ class RelatorioService
         $buckets = [];
 
         foreach ($pedidos as $pedido) {
-            $hour = $pedido->created_at?->format('H').'h' ?? '00h';
+            $hour = $pedido->created_at?->timezone(self::TIMEZONE)->format('H').'h' ?? '00h';
             $buckets[$hour] = ($buckets[$hour] ?? 0) + (float) $pedido->total;
         }
 
@@ -124,6 +203,123 @@ class RelatorioService
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  Collection<int, Pedido>  $pedidos
+     * @return list<array<string, mixed>>
+     */
+    private function salesByStall(
+        Evento $evento,
+        Collection $pedidos,
+        bool $includeFichaProgress,
+    ): array {
+        /** @var SupportCollection<string, Barraca> $stalls */
+        $stalls = Barraca::query()
+            ->where('evento_id', $evento->id)
+            ->get()
+            ->keyBy('id');
+
+        /** @var array<string, array<string, mixed>> $buckets */
+        $buckets = [];
+
+        foreach ($stalls as $stall) {
+            $buckets[$stall->id] = [
+                'stallId' => $stall->id,
+                'name' => $stall->name,
+                'color' => $stall->color,
+                'status' => $stall->status,
+                'revenue' => 0.0,
+                'orderCount' => 0,
+                '_orderIds' => [],
+            ];
+        }
+
+        foreach ($pedidos as $pedido) {
+            $stallsInPedido = [];
+
+            foreach ($pedido->itens as $item) {
+                $stallId = $this->resolveStallId($item, $stalls);
+                if ($stallId === null || ! isset($buckets[$stallId])) {
+                    continue;
+                }
+
+                $buckets[$stallId]['revenue'] += $this->lineTotal($item);
+                $stallsInPedido[$stallId] = true;
+            }
+
+            foreach (array_keys($stallsInPedido) as $stallId) {
+                $buckets[$stallId]['_orderIds'][$pedido->id] = true;
+            }
+        }
+
+        if ($includeFichaProgress && $pedidos->isNotEmpty()) {
+            $fichas = Ficha::query()
+                ->whereIn('pedido_id', $pedidos->pluck('id'))
+                ->get(['barraca_id', 'status']);
+
+            foreach ($fichas as $ficha) {
+                if (! isset($buckets[$ficha->barraca_id])) {
+                    continue;
+                }
+
+                $buckets[$ficha->barraca_id]['fichasIssued'] = ($buckets[$ficha->barraca_id]['fichasIssued'] ?? 0) + 1;
+                if ($ficha->status === 'delivered') {
+                    $buckets[$ficha->barraca_id]['fichasDelivered'] = ($buckets[$ficha->barraca_id]['fichasDelivered'] ?? 0) + 1;
+                }
+            }
+        }
+
+        return collect($buckets)
+            ->map(function (array $row) use ($includeFichaProgress) {
+                $row['revenue'] = round($row['revenue'], 2);
+                $row['orderCount'] = count($row['_orderIds']);
+                unset($row['_orderIds']);
+
+                return $row;
+            })
+            ->sortByDesc('revenue')
+            ->values()
+            ->pipe(function (SupportCollection $rows) use ($includeFichaProgress) {
+                $stallRevenueTotal = $rows->sum('revenue');
+
+                return $rows->map(function (array $row) use ($includeFichaProgress, $stallRevenueTotal) {
+                    if ($stallRevenueTotal > 0) {
+                        $row['percentage'] = round(($row['revenue'] / $stallRevenueTotal) * 100, 1);
+                    } else {
+                        $row['percentage'] = 0.0;
+                    }
+
+                    if ($includeFichaProgress) {
+                        $row['fichasIssued'] = $row['fichasIssued'] ?? 0;
+                        $row['fichasDelivered'] = $row['fichasDelivered'] ?? 0;
+                    }
+
+                    return $row;
+                });
+            })
+            ->all();
+    }
+
+    /**
+     * @param  SupportCollection<string, Barraca>  $stalls
+     */
+    private function resolveStallId(PedidoItem $item, SupportCollection $stalls): ?string
+    {
+        $variante = $item->ofertaVariante;
+        if ($variante?->oferta?->barraca_id) {
+            return $variante->oferta->barraca_id;
+        }
+
+        $snapshot = $item->item_snapshot ?? [];
+        $stallName = $snapshot['stallName'] ?? null;
+        if (! is_string($stallName) || $stallName === '') {
+            return null;
+        }
+
+        $match = $stalls->first(fn (Barraca $stall) => $stall->name === $stallName);
+
+        return $match?->id;
     }
 
     private function lineTotal(PedidoItem $item): float

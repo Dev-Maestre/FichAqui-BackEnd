@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/events/{eventId}/image', [EventImageController::class, 'store']);
     Route::post('/events/{eventId}/image/apply', [EventImageController::class, 'apply']);
     Route::get('/events/{eventId}/relatorios', [RelatorioController::class, 'show']);
+    Route::get('/events/{eventId}/resumo', [RelatorioController::class, 'resumo']);
     Route::post('/events/{eventId}/stalls', [StallController::class, 'store']);
     Route::patch('/events/{eventId}/stalls/{stallId}', [StallController::class, 'update']);
     Route::put('/events/{eventId}/stalls/{stallId}/offerings', [OfferingController::class, 'replaceForStall']);
