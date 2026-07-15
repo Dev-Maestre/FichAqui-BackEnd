@@ -107,14 +107,27 @@ class SavedCardService
                 break;
             }
 
-            if ($this->hasDuplicate($user, $gatewayCard->brand, $gatewayCard->lastFour)) {
-                continue;
-            }
-
             if (CartaoSalvo::query()
                 ->where('user_id', $user->id)
                 ->where('gateway_token', $gatewayCard->id)
                 ->exists()) {
+                continue;
+            }
+
+            $existing = CartaoSalvo::query()
+                ->where('user_id', $user->id)
+                ->where('brand', $gatewayCard->brand)
+                ->where('last_four', $gatewayCard->lastFour)
+                ->first();
+
+            if ($existing !== null) {
+                if (! is_string($existing->gateway_token) || $existing->gateway_token === '') {
+                    $existing->update([
+                        'gateway_token' => $gatewayCard->id,
+                        'holder_name' => $gatewayCard->holderName ?: $existing->holder_name,
+                    ]);
+                }
+
                 continue;
             }
 
