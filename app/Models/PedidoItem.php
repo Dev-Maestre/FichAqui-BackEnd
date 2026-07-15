@@ -28,4 +28,9 @@ class PedidoItem extends Model
     {
         return $this->belongsTo(Pedido::class, 'pedido_id');
     }
+
+    public function ofertaVariante(): BelongsTo
+    {
+        return $this->belongsTo(OfertaVariante::class, 'oferta_variante_id');
+    }
 }

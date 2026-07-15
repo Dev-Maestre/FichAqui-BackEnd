@@ -6,7 +6,9 @@ use App\Models\Barraca;
 use App\Models\Evento;
 use App\Models\Oferta;
 use App\Models\User;
+use App\Services\EventImageStorageService;
 use App\Support\CidadeResolver;
+use App\Support\EventImageSync;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +20,7 @@ class EventoWriteService
 
     public function __construct(
         private readonly OfferingWriteService $offeringWriteService,
+        private readonly EventImageStorageService $eventImageStorage,
     ) {}
 
     /**
@@ -37,6 +40,8 @@ class EventoWriteService
         $eventId = 'event-'.Str::lower((string) Str::ulid());
         $primaryColor = $validated['primaryColor'] ?? '#d97706';
 
+        $eventImage = EventImageSync::resolve($validated['banner'] ?? null, $validated['icon'] ?? null);
+
         $eventoAttrs = [
             'id' => $eventId,
             'name' => $validated['name'],
@@ -51,12 +56,12 @@ class EventoWriteService
             'latitude' => $validated['latitude'] ?? null,
             'longitude' => $validated['longitude'] ?? null,
             'organizer_id' => $user->organizer_id,
-            'banner' => $validated['banner'] ?? null,
+            'banner' => $eventImage,
             'status' => $validated['status'] ?? 'draft',
             'capacity' => $validated['capacity'] ?? 0,
             'primary_color' => $primaryColor,
             'code' => $validated['code'] ?? null,
-            'icon' => $validated['icon'] ?? '??',
+            'icon' => $eventImage,
         ];
 
         return DB::transaction(function () use ($eventoAttrs, $eventId, $primaryColor) {
@@ -106,6 +111,8 @@ class EventoWriteService
         $this->assertTypeImmutable($evento, $validated);
 
         $attrs = $this->mapToModelAttributes($validated, $evento);
+
+        $this->eventImageStorage->deleteIfReplaced($evento, $attrs);
 
         if ($attrs !== []) {
             $evento->update($attrs);
@@ -165,7 +172,7 @@ class EventoWriteService
 
             $value = $input[$from];
 
-            if (in_array($from, ['date', 'startTime', 'endTime'], true) && ($value === '' || $value === null)) {
+            if (in_array($from, ['date', 'startTime', 'endTime', 'banner', 'icon'], true) && ($value === '' || $value === null)) {
                 $attrs[$to] = null;
             } else {
                 $attrs[$to] = $value;
@@ -190,7 +197,27 @@ class EventoWriteService
             $this->assertCoordinatesForEvento($evento, $attrs);
         }
 
+        $this->applySyncedEventImage($attrs, $input, $evento);
+
         return $attrs;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     * @param  array<string, mixed>  $input
+     */
+    private function applySyncedEventImage(array &$attrs, array $input, ?Evento $evento = null): void
+    {
+        if (! array_key_exists('banner', $input) && ! array_key_exists('icon', $input)) {
+            return;
+        }
+
+        $banner = array_key_exists('banner', $input) ? $input['banner'] : $evento?->banner;
+        $icon = array_key_exists('icon', $input) ? $input['icon'] : $evento?->icon;
+        $image = EventImageSync::resolve($banner, $icon);
+
+        $attrs['banner'] = $image;
+        $attrs['icon'] = $image;
     }
 
     /**
@@ -334,7 +361,7 @@ class EventoWriteService
             'capacity' => ['sometimes', 'integer', 'min:0'],
             'primaryColor' => ['sometimes', 'string', 'max:32'],
             'code' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'icon' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'icon' => ['sometimes', 'nullable', 'string', 'max:255'],
             'cidade' => ['sometimes', 'nullable', 'string', 'max:255'],
             'estado' => ['sometimes', 'nullable', 'string', 'max:2'],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
@@ -362,7 +389,7 @@ class EventoWriteService
             'capacity' => ['sometimes', 'integer', 'min:0'],
             'primaryColor' => ['sometimes', 'string', 'max:32'],
             'code' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'icon' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'icon' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 }

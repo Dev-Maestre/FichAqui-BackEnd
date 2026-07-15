@@ -51,7 +51,9 @@ Cadastre `MP_WEBHOOK_URL` no painel Mercado Pago (Webhooks) com os tópicos **Pa
 ## Desenvolvimento local
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 API em `http://localhost:8001`, Postgres em `localhost:5433`.
+
+O `docker-compose.dev.yml` monta o codigo local no container (`live-reload`): alteracoes em PHP, rotas e configs entram na proxima requisicao, sem rebuild da imagem. Rebuild apenas quando `composer.json`, `composer.lock` ou `Dockerfile.dev` mudarem.

@@ -14,6 +14,8 @@ use App\Models\Oferta;
 use App\Models\Pedido;
 use App\Models\User;
 use App\Support\AssetUrl;
+use App\Support\EventImageSync;
+use App\Support\ItemNameFormatter;
 use App\Support\PrimaryRoleResolver;
 
 use Illuminate\Support\Collection;
@@ -45,6 +47,8 @@ class FrontendPresenter
 
     public static function evento(Evento $evento): array
     {
+        $image = self::asset(EventImageSync::resolve($evento->banner, $evento->icon));
+
         return [
             'id' => $evento->id,
             'name' => $evento->name,
@@ -59,12 +63,12 @@ class FrontendPresenter
             'latitude' => $evento->latitude !== null ? (float) $evento->latitude : null,
             'longitude' => $evento->longitude !== null ? (float) $evento->longitude : null,
             'organizerId' => $evento->organizer_id,
-            'banner' => self::asset($evento->banner),
+            'banner' => $image,
             'status' => $evento->status,
             'capacity' => $evento->capacity,
             'primaryColor' => $evento->primary_color,
             'code' => $evento->code,
-            'icon' => $evento->icon,
+            'icon' => $image,
             'isEstablishment' => $evento->isEstabelecimento(),
         ];
     }
@@ -236,7 +240,7 @@ class FrontendPresenter
         return [
             'id' => $ficha->id,
             'orderId' => $ficha->pedido_id,
-            'itemName' => $ficha->item_name,
+            'itemName' => ItemNameFormatter::normalizeLegacy($ficha->item_name),
             'itemImage' => self::asset($ficha->item_image),
             'stallId' => $ficha->barraca_id,
             'stallName' => $ficha->barraca_name,
@@ -367,7 +371,7 @@ class FrontendPresenter
 
             if (isset($snapshot['name'], $snapshot['stallName'])) {
                 return [
-                    'name' => $snapshot['name'],
+                    'name' => ItemNameFormatter::normalizeLegacy((string) $snapshot['name']),
                     'quantity' => $item->quantity,
                     'stallName' => $snapshot['stallName'],
                 ];
@@ -378,7 +382,7 @@ class FrontendPresenter
             $stallName = is_array($legacyItem) ? ($legacyItem['stallId'] ?? '') : '';
 
             return [
-                'name' => $name,
+                'name' => ItemNameFormatter::normalizeLegacy($name),
                 'quantity' => $item->quantity,
                 'stallName' => $stallName,
             ];

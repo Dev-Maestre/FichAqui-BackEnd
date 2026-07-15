@@ -21,7 +21,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     depends_on:
       postgres:
@@ -30,19 +30,23 @@ services:
       - "${APP_PORT:-8001}:${APP_PORT:-8001}"
     env_file:
       - .env
+    volumes:
+      - .:/var/www/html
+      - api_vendor:/var/www/html/vendor
     environment:
-      APP_ENV: production
-      APP_DEBUG: false
-      APP_URL: https://fichaqui.baiacubo.tech
+      APP_ENV: local
+      APP_DEBUG: true
+      APP_URL: http://localhost:${APP_PORT:-8001}
       DB_HOST: postgres
       DB_PORT: 5432
     command: >
-      sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist ${COMPOSER_INSTALL_FLAGS:-}; fi &&
+      sh -c "composer install --no-interaction --prefer-dist --no-scripts &&
              php artisan package:discover --ansi || true &&
              php artisan config:clear --no-interaction &&
              php artisan migrate --force --no-interaction &&
              php artisan db:seed --force --no-interaction || true &&
-             php artisan serve --host=0.0.0.0 --port=$${APP_PORT:-8001}"
+             php artisan serve --host=0.0.0.0 --port=$${APP_PORT:-8001} --no-reload"
 
 volumes:
   fichaqui_postgres_data:
+  api_vendor:

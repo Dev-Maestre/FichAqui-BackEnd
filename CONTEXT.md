@@ -90,3 +90,11 @@ _Avoid_: Lat/lng, geolocation, pin
 **Receita do evento**:
 Soma dos Pedidos com pagamento confirmado (exclui pagamento pendente e recusado), independente de as Fichas já terem sido retiradas.
 _Avoid_: Revenue, faturamento líquido, GMV
+
+**Relatório do Evento**:
+Visão analítica agregada para o organizador — receita total, quantidade de pedidos, ticket médio, vendas por hora do dia, vendas por categoria, produtos mais vendidos e **vendas por Barraca** (receita e participação no evento). Abrange **todo o período** do evento ou estabelecimento. Somente pedidos com pagamento confirmado.
+_Avoid_: Analytics, visitantes
+
+**Resumo operacional**:
+KPIs do **dia corrente** (`America/Sao_Paulo`): pedidos pagos hoje, receita de hoje e consumidores distintos (`user_id`) que compraram hoje. Painel inicial do admin — escopo diferente do relatório completo. Inclui ranking de Barracas no dia (receita por linha, pedidos distintos que incluem a Barraca — Pedido multi-barraca conta em cada uma — e progresso de retirada: fichas emitidas vs entregues). Pagamento pendente não entra na receita; `pendingOrderCount` opcional na API para aviso no front.
+_Avoid_: Dashboard, clientes
