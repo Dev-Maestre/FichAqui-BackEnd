@@ -92,12 +92,11 @@ class StagingDemoSeeder extends Seeder
     {
         $maria = User::query()
             ->where('external_id', 'user-maria')
-            ->orWhere('email', 'maria@testuser.com')
             ->first();
 
         if ($maria === null) {
             throw new RuntimeException(
-                'Missing demo user user-maria / maria@testuser.com. Run `php artisan db:seed` before StagingDemoSeeder.',
+                'Missing demo user user-maria. Run `php artisan db:seed` before StagingDemoSeeder.',
             );
         }
 
@@ -363,7 +362,7 @@ class StagingDemoSeeder extends Seeder
         $this->command->info('✓ Staging demo data seeded (idempotent)');
         $this->command->newLine();
         $this->command->line('Accounts:');
-        $this->command->line('  maria@testuser.com       / 123456  (cliente)');
+        $this->command->line('  test_user_5207637493757128652@testuser.com  / 123456  (cliente)');
         $this->command->line('  raul@paroquia.com        / 123456  (organizador)');
         $this->command->line('  atendente@email.com      / 123456  (atendente, stall-1)');
         $this->command->newLine();

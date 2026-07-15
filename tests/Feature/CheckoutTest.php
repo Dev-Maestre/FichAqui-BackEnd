@@ -29,7 +29,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_with_offerings_generates_fichas(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -61,7 +61,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_rejects_unavailable_variant(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -91,7 +91,7 @@ class CheckoutTest extends TestCase
             'is_default' => true,
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -111,7 +111,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_with_wallet_debits_ledger(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $initialBalance = (float) Carteira::query()->where('user_id', $maria->id)->value('balance');
@@ -152,7 +152,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_with_insufficient_wallet_balance_returns_422(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         Carteira::query()->where('user_id', $maria->id)->update(['balance' => 5]);

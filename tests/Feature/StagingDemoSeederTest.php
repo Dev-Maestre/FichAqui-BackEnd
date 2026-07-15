@@ -78,7 +78,7 @@ class StagingDemoSeederTest extends TestCase
             'payment_status' => 'pending',
         ]);
 
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         $balance = Carteira::query()->where('user_id', $maria->id)->value('balance');
 
         $this->assertSame(78.0, (float) $balance);

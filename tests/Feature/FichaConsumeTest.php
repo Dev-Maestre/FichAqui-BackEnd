@@ -39,7 +39,7 @@ class FichaConsumeTest extends TestCase
 
     public function test_consume_one_ficha_keeps_pedido_available(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -61,7 +61,7 @@ class FichaConsumeTest extends TestCase
 
     public function test_consume_all_fichas_marks_pedido_delivered(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -83,7 +83,7 @@ class FichaConsumeTest extends TestCase
 
     public function test_consume_is_idempotent(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -108,7 +108,7 @@ class FichaConsumeTest extends TestCase
 
     public function test_lookup_by_qr_returns_ficha(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -139,7 +139,7 @@ class FichaConsumeTest extends TestCase
 
     public function test_consumer_cannot_consume_ficha(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');
@@ -159,7 +159,7 @@ class FichaConsumeTest extends TestCase
 
     public function test_atendente_cannot_consume_ficha_from_other_stall(): void
     {
-        $maria = User::query()->where('email', 'maria@testuser.com')->firstOrFail();
+        $maria = User::query()->where('email', 'test_user_5207637493757128652@testuser.com')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-2', 'milho-verde');
