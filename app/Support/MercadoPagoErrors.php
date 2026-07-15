@@ -76,7 +76,7 @@ class MercadoPagoErrors
         }
 
         if (str_contains($code, 'invalid_user')) {
-            return 'Usuario pagador invalido no Mercado Pago.';
+            return 'Usuario pagador invalido no Mercado Pago: crie um comprador de teste com o mesmo e-mail do login (@testuser.com) em Credenciais de teste > Contas de teste no painel MP.';
         }
 
         return $detail;

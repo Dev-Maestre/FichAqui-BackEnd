@@ -13,6 +13,7 @@ use App\Models\CarteiraRecarga;
 use App\Models\User;
 use App\Support\Cpf;
 use App\Support\MercadoPagoErrors;
+use App\Support\MercadoPagoSandbox;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -134,7 +135,7 @@ class WalletTopUpService
             ]);
         }
 
-        $this->assertSandboxPayerEmail($user);
+        MercadoPagoSandbox::assertPayerEmail($user);
 
         $driver = $this->resolvePixDriver();
 
@@ -236,24 +237,6 @@ class WalletTopUpService
         $sanitized = preg_replace('/[^A-Za-z0-9_-]/', '', $reference) ?? $reference;
 
         return Str::limit($sanitized !== '' ? $sanitized : $reference, 64, '');
-    }
-
-    private function assertSandboxPayerEmail(User $user): void
-    {
-        if (! config('mercadopago.sandbox')) {
-            return;
-        }
-
-        if (str_ends_with(strtolower($user->email), '@testuser.com')) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'paymentMethod' => [
-                'No sandbox do Mercado Pago, use um e-mail de comprador de teste (@testuser.com). '
-                .'Crie em Credenciais de teste > Contas de teste no painel MP.',
-            ],
-        ]);
     }
 
     private function resolvePixDriver(): string
@@ -393,13 +376,17 @@ class WalletTopUpService
             }
         }
 
-        $this->assertSandboxPayerEmail($user);
+        MercadoPagoSandbox::assertPayerEmail($user);
 
         $mercadoPagoCustomerId = null;
 
         if ($saveCard || ($cardId !== null && $cardId !== '')) {
             $mercadoPagoCustomerId = $this->savedCardService->ensureMercadoPagoCustomer($user);
-        } elseif (is_string($user->mercadopago_customer_id) && $user->mercadopago_customer_id !== '') {
+        } elseif (
+            MercadoPagoSandbox::shouldAttachCachedCustomerId()
+            && is_string($user->mercadopago_customer_id)
+            && $user->mercadopago_customer_id !== ''
+        ) {
             $mercadoPagoCustomerId = $user->mercadopago_customer_id;
         }
 
