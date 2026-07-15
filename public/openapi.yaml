@@ -726,7 +726,7 @@ components:
       properties:
         id:
           type: string
-          example: user-maria
+          example: user-apro
         email:
           type: string
         name:

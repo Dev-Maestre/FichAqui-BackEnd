@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Barraca;
 use App\Models\CartaoSalvo;
 use App\Models\Carteira;
+use App\Models\CarteiraMovimento;
 use App\Models\CarteiraRecarga;
 use App\Models\CatalogoProduto;
 use App\Models\Categoria;
@@ -117,6 +118,32 @@ class FrontendPresenter
                 ->map(fn (CartaoSalvo $cartao) => self::savedCard($cartao))
                 ->values()
                 ->all(),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     id: string,
+     *     description: string,
+     *     direction: 'credit'|'debit',
+     *     amount: float,
+     *     createdAt: string|null,
+     *     type: string,
+     *     originType: string,
+     *     originId: string
+     * }
+     */
+    public static function walletTransaction(CarteiraMovimento $movimento): array
+    {
+        return [
+            'id' => $movimento->id,
+            'description' => $movimento->descricao ?? '',
+            'direction' => $movimento->direction === 'credito' ? 'credit' : 'debit',
+            'amount' => (float) $movimento->amount,
+            'createdAt' => $movimento->created_at?->toIso8601String(),
+            'type' => $movimento->tipo,
+            'originType' => $movimento->origem_tipo,
+            'originId' => $movimento->origem_id,
         ];
     }
 

@@ -70,7 +70,7 @@ class FichaquiSeeder extends Seeder
                 'name' => 'APRO Silva',
                 'roles' => ['client'],
                 'phone' => '(41) 99999-1234',
-                'cpf' => '529.982.247-25',
+                'cpf' => '123.456.789-09',
                 'birth_date' => '1992-03-15',
             ],
             [
