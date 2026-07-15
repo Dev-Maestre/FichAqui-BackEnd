@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BootstrapController;
 use App\Http\Controllers\Api\CityController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\EventImageController;
 use App\Http\Controllers\Api\FichaController;
 use App\Http\Controllers\Api\MercadoPagoWebhookController;
 use App\Http\Controllers\Api\OfferingController;
@@ -43,6 +44,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/user/profile', [ProfileController::class, 'update']);
     Route::post('/events', [EventController::class, 'store']);
     Route::patch('/events/{eventId}', [EventController::class, 'update']);
+    Route::post('/events/{eventId}/image/upload-url', [EventImageController::class, 'issueUploadUrl']);
+    Route::post('/events/{eventId}/image', [EventImageController::class, 'store']);
+    Route::post('/events/{eventId}/image/apply', [EventImageController::class, 'apply']);
     Route::get('/events/{eventId}/relatorios', [RelatorioController::class, 'show']);
     Route::post('/events/{eventId}/stalls', [StallController::class, 'store']);
     Route::patch('/events/{eventId}/stalls/{stallId}', [StallController::class, 'update']);
