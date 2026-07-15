@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/events/{eventId}/stalls/{stallId}', [StallController::class, 'update']);
     Route::put('/events/{eventId}/stalls/{stallId}/offerings', [OfferingController::class, 'replaceForStall']);
     Route::get('/user/wallet', [WalletController::class, 'show']);
+    Route::get('/user/wallet/transactions', [WalletController::class, 'transactions']);
     Route::post('/user/wallet/cards', [WalletController::class, 'storeCard']);
     Route::delete('/user/wallet/cards/{cardId}', [WalletController::class, 'destroyCard']);
     Route::post('/user/wallet/top-up', [WalletController::class, 'topUp']);

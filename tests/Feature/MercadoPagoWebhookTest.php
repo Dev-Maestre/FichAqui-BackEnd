@@ -88,7 +88,7 @@ class MercadoPagoWebhookTest extends TestCase
                 ], 200),
         ]);
 
-        $maria = User::query()->where('external_id', 'user-maria')->firstOrFail();
+        $maria = User::query()->where('external_id', 'user-apro')->firstOrFail();
         Sanctum::actingAs($maria);
 
         $offeringId = Oferta::buildId('1', 'stall-1', 'pastel');

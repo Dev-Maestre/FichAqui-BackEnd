@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CartaoSalvo;
 use App\Models\Carteira;
+use App\Models\CarteiraMovimento;
 use App\Services\FrontendPresenter;
 use App\Services\SavedCardService;
 use App\Services\WalletTopUpService;
@@ -35,6 +36,22 @@ class WalletController extends Controller
             ->get();
 
         return response()->json(FrontendPresenter::wallet($carteira, $cartoes));
+    }
+
+    public function transactions(Request $request): JsonResponse
+    {
+        $movimentos = CarteiraMovimento::query()
+            ->where('user_id', $request->user()->id)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'transactions' => $movimentos
+                ->map(fn (CarteiraMovimento $movimento) => FrontendPresenter::walletTransaction($movimento))
+                ->values()
+                ->all(),
+        ]);
     }
 
     public function storeCard(Request $request): JsonResponse

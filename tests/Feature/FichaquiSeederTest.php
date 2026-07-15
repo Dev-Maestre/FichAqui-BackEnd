@@ -14,7 +14,7 @@ class FichaquiSeederTest extends TestCase
     public function test_fichaqui_seeder_updates_existing_user_by_external_id_when_email_differs(): void
     {
         User::factory()->create([
-            'external_id' => 'user-maria',
+            'external_id' => 'user-apro',
             'email' => 'outro-email@example.com',
             'name' => 'Outro Nome',
             'mercadopago_customer_id' => 'CUST-STALE',
@@ -24,9 +24,9 @@ class FichaquiSeederTest extends TestCase
 
         $this->assertDatabaseCount('users', 3);
         $this->assertDatabaseHas('users', [
-            'external_id' => 'user-maria',
+            'external_id' => 'user-apro',
             'email' => 'test_user_5207637493757128652@testuser.com',
-            'name' => 'Maria Silva',
+            'name' => 'APRO Silva',
             'mercadopago_customer_id' => null,
         ]);
     }

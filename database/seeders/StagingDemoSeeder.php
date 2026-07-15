@@ -93,12 +93,12 @@ class StagingDemoSeeder extends Seeder
     private function requireMaria(): User
     {
         $maria = User::query()
-            ->where('external_id', 'user-maria')
+            ->where('external_id', 'user-apro')
             ->first();
 
         if ($maria === null) {
             throw new RuntimeException(
-                'Missing demo user user-maria. Run `php artisan db:seed` before StagingDemoSeeder.',
+                'Missing demo user user-apro. Run `php artisan db:seed` before StagingDemoSeeder.',
             );
         }
 

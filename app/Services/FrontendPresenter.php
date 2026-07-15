@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Barraca;
 use App\Models\CartaoSalvo;
 use App\Models\Carteira;
+use App\Models\CarteiraMovimento;
 use App\Models\CarteiraRecarga;
 use App\Models\CatalogoProduto;
 use App\Models\Categoria;
@@ -24,11 +25,9 @@ class FrontendPresenter
 {
     public static function user(User $user): array
     {
-        $eventId = null;
-
-        if ($user->stall_id) {
-            $eventId = Barraca::query()->where('id', $user->stall_id)->value('evento_id');
-        }
+        $barraca = $user->stall_id
+            ? Barraca::query()->find($user->stall_id)
+            : null;
 
         return [
             'id' => $user->external_id ?? (string) $user->id,
@@ -41,7 +40,8 @@ class FrontendPresenter
             'roles' => $user->roles ?? [],
             'organizerId' => $user->organizer_id,
             'stallId' => $user->stall_id,
-            'eventId' => $eventId,
+            'stallName' => $barraca?->name,
+            'eventId' => $barraca?->evento_id,
         ];
     }
 
@@ -117,6 +117,32 @@ class FrontendPresenter
                 ->map(fn (CartaoSalvo $cartao) => self::savedCard($cartao))
                 ->values()
                 ->all(),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     id: string,
+     *     description: string,
+     *     direction: 'credit'|'debit',
+     *     amount: float,
+     *     createdAt: string|null,
+     *     type: string,
+     *     originType: string,
+     *     originId: string
+     * }
+     */
+    public static function walletTransaction(CarteiraMovimento $movimento): array
+    {
+        return [
+            'id' => $movimento->id,
+            'description' => $movimento->descricao ?? '',
+            'direction' => $movimento->direction === 'credito' ? 'credit' : 'debit',
+            'amount' => (float) $movimento->amount,
+            'createdAt' => $movimento->created_at?->toIso8601String(),
+            'type' => $movimento->tipo,
+            'originType' => $movimento->origem_tipo,
+            'originId' => $movimento->origem_id,
         ];
     }
 
